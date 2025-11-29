@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategic Command V10 - Nakamura Farm Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- USER CONFIGURATION (Embedded) -----------------------------------
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyCbwtb6PCIKITCNJLftprKeSxfvCdAr-ic",
+            authDomain: "nakamura-farm-f06b9.firebaseapp.com",
+            projectId: "nakamura-farm-f06b9",
+            storageBucket: "nakamura-farm-f06b9.firebasestorage.app",
+            messagingSenderId: "707695385840",
+            appId: "1:707695385840:web:bb09fb2e37ab5cd4ee7635"
+        };
+        // ---------------------------------------------------------------------
+
+        let firebaseConfig;
+        let appId = 'nakamura-farm-budget'; // Fixed App ID for this project
+
+        // Priority: Environment Variable (Preview) -> Hardcoded Config (GitHub/Local)
+        if (typeof __firebase_config !== 'undefined') {
+            firebaseConfig = JSON.parse(__firebase_config);
+            if (typeof __app_id !== 'undefined') appId = __app_id;
+        } else {
+            firebaseConfig = myFirebaseConfig;
+        }
+
+        let db, auth, user;
+
+        if (firebaseConfig) {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                // Anonymous Auth
+                signInAnonymously(auth).catch((error) => {
+                    console.error("Auth Error:", error);
+                    updateNetworkStatus("AUTH ERROR (Check Console)", "text-red-500");
+                });
+
+                onAuthStateChanged(auth, (u) => {
+                    if (u) {
+                        user = u;
+                        updateNetworkStatus("ONLINE (SYNCING)", "text-emerald-400");
+                        initDataSync();
+                    } else {
+                        updateNetworkStatus("OFFLINE", "text-red-400");
+                    }
+                });
+            } catch (e) {
+                console.error("Firebase Init Error:", e);
+                updateNetworkStatus("CONFIG ERROR", "text-red-500");
+            }
+        }
+
+        function updateNetworkStatus(msg, colorClass) {
+            const el = document.getElementById('networkStatus');
+            if(el) {
+                el.innerText = msg;
+                el.className = `text-[10px] font-bold font-sci-fi tracking-widest ${colorClass}`;
+            }
+        }
+
+        // --- Data Sync Logic ---
+        const COLLECTION_NAME = "budget_entries"; // Added to fix path depth
+        const DATA_DOC_ID = "budget_data_v1";
+        
+        function initDataSync() {
+            if (!user || !db) return;
+
+            // Using strict path for compatibility
+            // Path must have even number of segments for a document: artifacts/appId/public/data/COLLECTION_NAME/DATA_DOC_ID
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DATA_DOC_ID);
+
+            onSnapshot(docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    if(data.appState) {
+                        // Merge logic: Simply replace local state with cloud state for prototype
+                        window.appState = JSON.parse(data.appState);
+                        window.dispatchEvent(new Event('state-updated'));
+                    }
+                } else {
+                    // If no data exists in cloud, save current initial data
+                    saveToCloud(); 
+                }
+            });
+        }
+
+        window.saveToCloud = async function() {
+            if (!user || !db) return;
+            // Path must match initDataSync
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DATA_DOC_ID);
+            try {
+                await setDoc(docRef, {
+                    appState: JSON.stringify(window.appState),
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: user.uid
+                }, { merge: true });
+            } catch (e) {
+                console.error("Save failed:", e);
+            }
+        };
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #0f172a; color: #e2e8f0; overflow: hidden; }
+        .font-sci-fi { font-family: 'Chakra Petch', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .scan-effect::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, transparent 50%, rgba(16, 185, 129, 0.03) 50%); background-size: 100% 4px; pointer-events: none; z-index: 50; }
+        .tab-active { border-bottom: 2px solid #10b981; color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #64748b; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 0 15px rgba(56, 189, 248, 0.3); border-color: #38bdf8; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        [contenteditable="true"]:focus { outline: none; border-bottom: 1px dashed #10b981; background-color: rgba(16, 185, 129, 0.1); color: #fff; }
+        [contenteditable="true"]:hover { cursor: text; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #64748b; }
+    </style>
+</head>
+<body class="h-screen flex flex-col scan-effect relative">
+
+    <!-- HUD Header -->
+    <header class="h-16 bg-slate-900 border-b border-slate-700 flex items-center justify-between px-6 z-20 shadow-lg shrink-0">
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-emerald-600 rounded flex items-center justify-center font-sci-fi font-bold text-xl shadow-[0_0_10px_rgba(16,185,129,0.5)]">N</div>
+                <div>
+                    <div class="flex items-center group editable-trigger">
+                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V10</h1>
+                        <span class="ml-2 text-xs text-slate-600">CLOUD SYNC</span>
+                    </div>
+                    <div class="flex items-center group editable-trigger">
+                        <p contenteditable="true" class="text-[10px] text-emerald-400">Fiscal Period: 2025/10 - 2026/09</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex space-x-1 bg-slate-800 rounded p-1">
+                <button onclick="switchView('monthly')" id="tab-monthly" class="tab-active px-4 py-1.5 text-sm font-bold rounded transition flex items-center">
+                    <span class="mr-2">📅</span> Monthly
+                </button>
+                <button onclick="switchView('annual')" id="tab-annual" class="tab-inactive px-4 py-1.5 text-sm font-bold rounded transition flex items-center">
+                    <span class="mr-2">📈</span> Annual
+                </button>
+            </div>
+        </div>
+
+        <div class="flex space-x-8 items-center">
+            <div id="monthSelectorContainer" class="flex items-center bg-slate-800 rounded px-2 py-1 border border-slate-700">
+                <button onclick="changeMonth(-1)" class="text-slate-400 hover:text-white px-2 py-1">◀</button>
+                <div class="text-center px-2">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider">TARGET</div>
+                    <div class="font-sci-fi font-bold text-xl text-emerald-400" id="currentMonthDisplay">2025-10</div>
+                </div>
+                <button onclick="changeMonth(1)" class="text-slate-400 hover:text-white px-2 py-1">▶</button>
+            </div>
+
+            <div class="text-right">
+                <div id="networkStatus" class="text-[10px] font-bold font-sci-fi tracking-widest text-slate-500">CONNECTING...</div>
+                <div class="font-sci-fi font-bold text-2xl text-yellow-400" id="globalProfit">¥0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Content Area -->
+    <div class="flex-1 overflow-hidden relative">
+
+        <!-- VIEW 1: MONTHLY COMMAND -->
+        <div id="view-monthly" class="absolute inset-0 flex flex-col transition-transform duration-300 transform translate-x-0">
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Sidebar -->
+                <nav class="w-24 bg-slate-800 border-r border-slate-700 flex flex-col items-center py-6 space-y-4 z-10 shrink-0">
+                    <button onclick="switchLevel('L1')" id="nav-L1" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">🌱</span><span class="text-[10px] font-bold font-sci-fi">FARM</span></button>
+                    <button onclick="switchLevel('L2')" id="nav-L2" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">🛒</span><span class="text-[10px] font-bold font-sci-fi">SALES</span></button>
+                    <button onclick="switchLevel('L3')" id="nav-L3" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">☕</span><span class="text-[10px] font-bold font-sci-fi">CAFE</span></button>
+                </nav>
+
+                <!-- Workspace -->
+                <main class="flex-1 bg-slate-900 relative overflow-y-auto p-6">
+                    <!-- Sector Header -->
+                    <div class="flex justify-between items-end mb-6 border-b border-slate-700 pb-2 sticky top-0 bg-slate-900/95 backdrop-blur z-10 pt-2">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white flex items-center">
+                                <span id="sectorIcon" class="mr-3 text-3xl">🌱</span>
+                                <div>
+                                    <span id="sectorTitle" class="font-sci-fi block text-emerald-400 text-xs tracking-widest">SECTOR L1</span>
+                                    <span id="sectorName" contenteditable="true" onblur="updateSectorName(this)" class="text-xl outline-none border-b border-transparent focus:border-emerald-500 transition">農園事業 (Farm)</span>
+                                </div>
+                            </h2>
+                        </div>
+                        <div class="flex space-x-4 text-sm font-mono bg-slate-800 p-2 rounded-lg border border-slate-600">
+                            <div class="flex items-center text-green-400"><span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>Plan Rev: <span id="sectorRevPlan" class="ml-2 font-bold">¥0</span></div>
+                            <div class="flex items-center text-red-400"><span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>Plan Exp: <span id="sectorExpPlan" class="ml-2 font-bold">¥0</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Input Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <div class="flex justify-between items-center mb-4 border-l-4 border-green-500 pl-3">
+                                <h3 class="text-green-400 font-bold font-sci-fi tracking-widest">REVENUE</h3>
+                                <span class="text-xs text-slate-500 font-mono">Month: <span class="current-month-text">--</span></span>
+                            </div>
+                            <div id="revenueContainer" class="space-y-3"></div>
+                            <button onclick="openCategoryModal('revenue')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-green-400 transition font-bold">+ New Revenue Source</button>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-4 border-l-4 border-red-500 pl-3">
+                                <h3 class="text-red-400 font-bold font-sci-fi tracking-widest">EXPENSES</h3>
+                                <span class="text-xs text-slate-500 font-mono">Month: <span class="current-month-text">--</span></span>
+                            </div>
+                            <div id="expenseContainer" class="space-y-3"></div>
+                            <button onclick="openCategoryModal('expense')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-red-400 transition font-bold">+ New Expense Category</button>
+                        </div>
+                    </div>
+                    <div class="h-20"></div>
+                </main>
+            </div>
+        </div>
+
+        <!-- VIEW 2: ANNUAL STRATEGY -->
+        <div id="view-annual" class="absolute inset-0 bg-slate-100 flex flex-col transition-transform duration-300 transform translate-x-full overflow-y-auto">
+            <div class="max-w-7xl mx-auto w-full p-8 space-y-8">
+                <div class="flex justify-between items-end border-b border-slate-300 pb-4">
+                    <div>
+                        <h2 class="text-3xl font-bold text-slate-800 flex items-center gap-3"><span class="bg-blue-600 text-white rounded p-1 text-2xl">📊</span> Annual Strategic Dashboard</h2>
+                        <p class="text-slate-500 mt-1">Fiscal Year Outlook (Oct 2025 - Sep 2026)</p>
+                    </div>
+                    <div class="flex space-x-4">
+                        <div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="text-xs text-slate-400 uppercase">Total Plan Revenue</div><div class="text-xl font-bold text-green-600" id="annualTotalRevPlan">¥0</div></div>
+                        <div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="text-xs text-slate-400 uppercase">Total Actual Revenue</div><div class="text-xl font-bold text-green-700" id="annualTotalRevAct">¥0</div></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">📈 Profit/Loss Trend</h3><div class="chart-container"><canvas id="annualTrendChart"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">🍰 Revenue Composition</h3><div class="chart-container"><canvas id="annualSectorChart"></canvas></div></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                    <h3 class="font-bold text-slate-700 mb-4">📅 Monthly Performance Table</h3>
+                    <table class="w-full text-sm text-left text-slate-600">
+                        <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3">Month</th><th class="px-6 py-3 text-right">Farm Rev</th><th class="px-6 py-3 text-right">Sales Rev</th><th class="px-6 py-3 text-right">Cafe Rev</th><th class="px-6 py-3 text-right font-bold bg-green-50 border-l border-green-100">Total Rev</th><th class="px-6 py-3 text-right font-bold bg-red-50 border-l border-red-100">Total Exp</th><th class="px-6 py-3 text-right font-black border-l">Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="annualTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="h-10"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1: Detail/Item Editor -->
+    <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 w-full max-w-3xl rounded-xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-slate-700 bg-slate-900 rounded-t-xl flex justify-between">
+                <div><div class="text-xs text-emerald-400 font-sci-fi mb-1">EDITING DETAILS</div><h3 class="text-2xl font-bold text-white" id="modalTitle">Account</h3></div>
+                <div class="text-right"><div class="text-xs text-slate-400 uppercase">Total (<span id="modalMonthDisp"></span>)</div><div class="text-3xl font-mono font-bold text-white" id="modalTotal">¥0</div></div>
+            </div>
+            <div class="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center space-x-3 w-full"><label class="text-sm text-slate-400 font-bold whitespace-nowrap">Monthly Budget:</label><div class="relative w-40"><span class="absolute left-3 top-2 text-slate-500">¥</span><input type="number" id="modalBudget" class="w-full bg-slate-900 border border-slate-600 text-slate-300 pl-6 pr-3 py-1.5 rounded text-right font-mono focus:border-emerald-500 outline-none" placeholder="0"></div></div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-900/30" id="modalItemsList"></div>
+            <div class="p-5 border-t border-slate-700 bg-slate-900 rounded-b-xl flex justify-between">
+                <button onclick="addModalItem()" class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+ Add Entry</button>
+                <div class="flex space-x-3"><button onclick="closeModal()" class="px-5 py-2 text-slate-400 hover:text-white transition">Close</button><button onclick="saveModalData()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold shadow-lg">Confirm</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: New Category Creator -->
+    <div id="categoryModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 w-full max-w-md rounded-xl shadow-2xl border-2 border-slate-600 p-6">
+            <h3 class="text-xl font-bold text-white mb-4">Create New Category</h3>
+            <div class="mb-4"><label class="block text-slate-400 text-xs uppercase mb-2">Name</label><input type="text" id="newCategoryName" class="w-full bg-slate-900 border border-slate-600 text-white px-4 py-2 rounded focus:border-emerald-500 outline-none"></div>
+            <input type="hidden" id="newCategoryType" value="">
+            <div class="flex justify-end space-x-3 mt-6"><button onclick="closeCategoryModal()" class="px-4 py-2 text-slate-400 hover:text-white">Cancel</button><button onclick="saveNewCategory()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">Create</button></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & State ---
+        const fiscalMonths = ['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09'];
+        const monthlyPlans = {
+            '2025-10': { l1_r: 532284, l1_e: 532284, l2_r: 30000, l2_e: 1024484, l3_r: 80000, l3_e: 97500 },
+            '2025-11': { l1_r: 641854, l1_e: 671854, l2_r: 450000, l2_e: 1148054, l3_r: 200000, l3_e: 61500 },
+            '2025-12': { l1_r: 534304, l1_e: 534304, l2_r: 2300000, l2_e: 1037504, l3_r: 200000, l3_e: 97500 },
+            '2026-01': { l1_r: 3000000, l1_e: 1200000, l2_r: 1500000, l2_e: 500000, l3_r: 200000, l3_e: 100000 },
+            '2026-02': { l1_r: 3200000, l1_e: 1100000, l2_r: 1000000, l2_e: 400000, l3_r: 200000, l3_e: 100000 },
+            '2026-03': { l1_r: 2500000, l1_e: 1400000, l2_r: 800000, l2_e: 400000, l3_r: 250000, l3_e: 100000 },
+            '2026-04': { l1_r: 1500000, l1_e: 1000000, l2_r: 500000, l2_e: 300000, l3_r: 250000, l3_e: 100000 },
+            '2026-05': { l1_r: 800000, l1_e: 800000, l2_r: 300000, l2_e: 200000, l3_r: 300000, l3_e: 100000 },
+            '2026-06': { l1_r: 300000, l1_e: 600000, l2_r: 200000, l2_e: 150000, l3_r: 300000, l3_e: 100000 },
+            '2026-07': { l1_r: 100000, l1_e: 500000, l2_r: 100000, l2_e: 100000, l3_r: 400000, l3_e: 120000 },
+            '2026-08': { l1_r: 100000, l1_e: 500000, l2_r: 100000, l2_e: 100000, l3_r: 400000, l3_e: 120000 },
+            '2026-09': { l1_r: 200000, l1_e: 600000, l2_r: 100000, l2_e: 100000, l3_r: 300000, l3_e: 100000 },
+        };
+
+        let currentMonthIdx = 0; 
+        let currentLevel = 'L1';
+        let currentView = 'monthly';
+
+        // Default Data
+        const initialData = {
+            L1: { 
+                name: '農園事業 (Farm)', icon: '🌱', colorClass: 'green',
+                revenue: [ { id: 'l1_r_main', name: '農園収入 (CSV計画分)', type: 'l1_r', items: [] } ],
+                expense: [ { id: 'l1_e_main', name: '農園支出 (CSV計画分)', type: 'l1_e', items: [] } ]
+            },
+            L2: { 
+                name: '販売事業 (Sales)', icon: '🛒', colorClass: 'blue',
+                revenue: [ { id: 'l2_r_main', name: '販売収入 (CSV計画分)', type: 'l2_r', items: [] } ],
+                expense: [ { id: 'l2_e_main', name: '販売支出 (CSV計画分)', type: 'l2_e', items: [] } ]
+            },
+            L3: { 
+                name: 'カフェバー (Cafe)', icon: '☕', colorClass: 'orange',
+                revenue: [ { id: 'l3_r_main', name: 'カフェ収入 (CSV計画分)', type: 'l3_r', items: [] } ],
+                expense: [ { id: 'l3_e_main', name: 'カフェ支出 (CSV計画分)', type: 'l3_e', items: [] } ]
+            }
+        };
+
+        window.appState = JSON.parse(JSON.stringify(initialData));
+        
+        let currentEditingId = null;
+        let currentEditingType = null;
+        let trendChart = null;
+        let sectorChart = null;
+
+        function init() {
+            // Initial render, real data will arrive via sync
+            renderMonthlyView();
+            updateGlobalHeader();
+        }
+
+        window.addEventListener('state-updated', () => {
+            renderMonthlyView();
+            updateGlobalHeader();
+            if(currentView === 'annual') renderAnnualView();
+        });
+
+        window.addEventListener('app-ready', () => {
+            init();
+        });
+
+        // --- Editing Logic with Auto-Save ---
+        function updateSectorName(el) {
+            const newName = el.innerText.trim();
+            if(newName) {
+                window.appState[currentLevel].name = newName;
+                if(window.saveToCloud) window.saveToCloud();
+            }
+        }
+        window.updateSectorName = updateSectorName;
+
+        function updateCategoryName(el, id, type) {
+            const newName = el.innerText.trim();
+            if(newName) {
+                const category = window.appState[currentLevel][type].find(c => c.id === id);
+                if(category) {
+                    category.name = newName;
+                    if(window.saveToCloud) window.saveToCloud();
+                }
+            }
+        }
+        window.updateCategoryName = updateCategoryName;
+
+        // --- View Logic ---
+        function switchView(view) {
+            currentView = view;
+            const mContainer = document.getElementById('view-monthly');
+            const aContainer = document.getElementById('view-annual');
+            const mTab = document.getElementById('tab-monthly');
+            const aTab = document.getElementById('tab-annual');
+            const monthSelector = document.getElementById('monthSelectorContainer');
+
+            if (view === 'annual') {
+                mContainer.style.transform = 'translateX(-100%)';
+                aContainer.style.transform = 'translateX(0)';
+                monthSelector.style.display = 'none';
+                mTab.className = "tab-inactive px-4 py-1.5 text-sm font-bold rounded transition flex items-center";
+                aTab.className = "tab-active px-4 py-1.5 text-sm font-bold rounded transition flex items-center";
+                renderAnnualView();
+            } else {
+                mContainer.style.transform = 'translateX(0)';
+                aContainer.style.transform = 'translateX(100%)';
+                monthSelector.style.display = 'flex';
+                mTab.className = "tab-active px-4 py-1.5 text-sm font-bold rounded transition flex items-center";
+                aTab.className = "tab-inactive px-4 py-1.5 text-sm font-bold rounded transition flex items-center";
+            }
+        }
+        window.switchView = switchView;
+
+        function switchLevel(level) {
+            currentLevel = level;
+            renderMonthlyView();
+        }
+        window.switchLevel = switchLevel;
+
+        function changeMonth(delta) {
+            let newIdx = currentMonthIdx + delta;
+            if (newIdx < 0) newIdx = 0;
+            if (newIdx >= fiscalMonths.length) newIdx = fiscalMonths.length - 1;
+            currentMonthIdx = newIdx;
+            document.getElementById('currentMonthDisplay').textContent = fiscalMonths[currentMonthIdx];
+            if (currentView === 'monthly') renderMonthlyView();
+        }
+        window.changeMonth = changeMonth;
+
+        function getMonthlyBudget(monthStr, planKey) {
+            if (monthlyPlans[monthStr] && monthlyPlans[monthStr][planKey] !== undefined) {
+                return monthlyPlans[monthStr][planKey];
+            }
+            return 0;
+        }
+
+        function renderMonthlyView() {
+            const data = window.appState[currentLevel];
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+
+            ['L1', 'L2', 'L3'].forEach(l => {
+                const btn = document.getElementById(`nav-${l}`);
+                const isActive = l === currentLevel;
+                const color = window.appState[l].colorClass;
+                btn.className = isActive 
+                    ? `w-16 h-16 rounded-xl bg-slate-600 text-white flex flex-col items-center justify-center border-2 border-${color}-500 shadow-lg scale-110 transition`
+                    : `group w-16 h-16 rounded-xl bg-slate-800 text-slate-500 flex flex-col items-center justify-center border-2 border-transparent hover:bg-slate-700 transition`;
+            });
+
+            const sectorNameEl = document.getElementById('sectorName');
+            if(sectorNameEl.innerText !== data.name) sectorNameEl.innerText = data.name;
+
+            document.getElementById('sectorIcon').textContent = data.icon;
+            document.querySelectorAll('.current-month-text').forEach(el => el.textContent = currentMonthStr);
+
+            const revContainer = document.getElementById('revenueContainer');
+            const expContainer = document.getElementById('expenseContainer');
+            revContainer.innerHTML = '';
+            expContainer.innerHTML = '';
+
+            let totalRevPlan = 0;
+            let totalExpPlan = 0;
+
+            const getMonthTotal = (items) => {
+                return items
+                    .filter(i => i.date.startsWith(currentMonthStr))
+                    .reduce((sum, i) => sum + i.val, 0);
+            };
+
+            data.revenue.forEach(cat => {
+                const actual = getMonthTotal(cat.items);
+                const budget = getMonthlyBudget(currentMonthStr, cat.type); 
+                totalRevPlan += budget;
+                revContainer.appendChild(createCard(cat, 'revenue', actual, budget));
+            });
+
+            data.expense.forEach(cat => {
+                const actual = getMonthTotal(cat.items);
+                const budget = getMonthlyBudget(currentMonthStr, cat.type);
+                totalExpPlan += budget;
+                expContainer.appendChild(createCard(cat, 'expense', actual, budget));
+            });
+
+            document.getElementById('sectorRevPlan').textContent = '¥' + totalRevPlan.toLocaleString();
+            document.getElementById('sectorExpPlan').textContent = '¥' + totalExpPlan.toLocaleString();
+        }
+
+        function createCard(category, type, actualValue, budgetValue) {
+            const isRev = type === 'revenue';
+            const progress = budgetValue > 0 ? (actualValue / budgetValue) * 100 : 0;
+            let barColor = isRev ? 'bg-emerald-500' : 'bg-blue-500';
+            if (isRev && progress >= 100) barColor = 'bg-yellow-400';
+            if (!isRev && progress > 100) barColor = 'bg-red-500';
+
+            const div = document.createElement('div');
+            div.className = "bg-slate-800 border border-slate-700 rounded-xl p-4 cursor-pointer card-hover relative overflow-hidden group";
+            div.onclick = (e) => {
+                if(e.target.isContentEditable) return; 
+                openModal(category.id, type);
+            };
+
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-2 relative z-10">
+                    <h4 contenteditable="true" onblur="updateCategoryName(this, '${category.id}', '${type}')" class="font-bold text-white hover:border-b hover:border-emerald-500 transition">${category.name}</h4>
+                    <div class="text-right">
+                        <div class="text-white font-mono font-bold text-lg">¥${actualValue.toLocaleString()}</div>
+                    </div>
+                </div>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden relative z-10 mb-1">
+                    <div class="${barColor} h-full transition-all" style="width: ${Math.min(100, progress)}%"></div>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-500 relative z-10">
+                    <span>Plan: ¥${budgetValue.toLocaleString()}</span>
+                    <span>${progress.toFixed(0)}%</span>
+                </div>
+                <div class="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-emerald-400 text-xs font-bold pointer-events-none">EDIT DETAILS ></div>
+            `;
+            return div;
+        }
+
+        function renderAnnualView() {
+            const monthlyStats = fiscalMonths.map(month => {
+                let stats = { month, farmRev: 0, salesRev: 0, cafeRev: 0, totalRev: 0, totalExp: 0, totalRevPlan: 0 };
+                
+                const sumCatAct = (cats) => cats.reduce((acc, cat) => 
+                    acc + cat.items.filter(i => i.date.startsWith(month)).reduce((s, i) => s + i.val, 0), 0);
+                const sumCatPlan = (cats) => cats.reduce((acc, cat) => acc + getMonthlyBudget(month, cat.type), 0);
+
+                stats.farmRev = sumCatAct(window.appState.L1.revenue);
+                stats.salesRev = sumCatAct(window.appState.L2.revenue);
+                stats.cafeRev = sumCatAct(window.appState.L3.revenue);
+                const farmExp = sumCatAct(window.appState.L1.expense);
+                const salesExp = sumCatAct(window.appState.L2.expense);
+                const cafeExp = sumCatAct(window.appState.L3.expense);
+
+                stats.totalRev = stats.farmRev + stats.salesRev + stats.cafeRev;
+                stats.totalExp = farmExp + salesExp + cafeExp;
+                stats.totalRevPlan = sumCatPlan(window.appState.L1.revenue) + sumCatPlan(window.appState.L2.revenue) + sumCatPlan(window.appState.L3.revenue);
+                return stats;
+            });
+
+            const totalRev = monthlyStats.reduce((s, m) => s + m.totalRev, 0);
+            const totalRevPlan = monthlyStats.reduce((s, m) => s + m.totalRevPlan, 0);
+            document.getElementById('annualTotalRevAct').textContent = '¥' + totalRev.toLocaleString();
+            document.getElementById('annualTotalRevPlan').textContent = '¥' + totalRevPlan.toLocaleString();
+
+            updateAnnualCharts(monthlyStats);
+
+            const tbody = document.getElementById('annualTableBody');
+            tbody.innerHTML = '';
+            monthlyStats.forEach(m => {
+                const p = m.totalRev - m.totalExp;
+                const tr = document.createElement('tr');
+                tr.className = "bg-white border-b hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="px-6 py-3 font-medium text-slate-900">${m.month}</td>
+                    <td class="px-6 py-3 text-right">${m.farmRev > 0 ? m.farmRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right">${m.salesRev > 0 ? m.salesRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right">${m.cafeRev > 0 ? m.cafeRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right font-bold border-l bg-green-50">${m.totalRev.toLocaleString()}</td>
+                    <td class="px-6 py-3 text-right font-bold border-l bg-red-50 text-red-600">${m.totalExp.toLocaleString()}</td>
+                    <td class="px-6 py-3 text-right font-black border-l ${p>=0 ? 'text-green-600':'text-red-600'}">${p.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateAnnualCharts(data) {
+            const ctxTrend = document.getElementById('annualTrendChart').getContext('2d');
+            const ctxSector = document.getElementById('annualSectorChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+            if (sectorChart) sectorChart.destroy();
+
+            trendChart = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.month),
+                    datasets: [
+                        { label: 'Plan Revenue', data: data.map(d => d.totalRevPlan), borderColor: '#94a3b8', borderDash: [5,5], tension: 0.1 },
+                        { label: 'Actual Revenue', data: data.map(d => d.totalRev), borderColor: '#10b981', tension: 0.3 },
+                        { label: 'Actual Expense', data: data.map(d => d.totalExp), borderColor: '#ef4444', tension: 0.3 },
+                        { label: 'Profit', data: data.map(d => d.totalRev - d.totalExp), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            sectorChart = new Chart(ctxSector, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.month),
+                    datasets: [
+                        { label: 'Farm', data: data.map(d => d.farmRev), backgroundColor: '#10b981' },
+                        { label: 'Sales', data: data.map(d => d.salesRev), backgroundColor: '#3b82f6' },
+                        { label: 'Cafe', data: data.map(d => d.cafeRev), backgroundColor: '#f97316' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
+            });
+        }
+
+        // --- Modals ---
+        function openModal(id, type) {
+            currentEditingId = id;
+            currentEditingType = type;
+            const category = window.appState[currentLevel][type].find(c => c.id === id);
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+
+            document.getElementById('modalTitle').textContent = category.name;
+            document.getElementById('modalMonthDisp').textContent = currentMonthStr;
+            document.getElementById('modalBudget').value = getMonthlyBudget(currentMonthStr, category.type);
+
+            const monthItems = category.items.filter(i => i.date.startsWith(currentMonthStr));
+            renderModalItems(monthItems);
+            
+            const total = monthItems.reduce((s, i) => s + i.val, 0);
+            document.getElementById('modalTotal').textContent = '¥' + total.toLocaleString();
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+        window.openModal = openModal;
+
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
+        window.closeModal = closeModal;
+
+        function renderModalItems(items) {
+            const list = document.getElementById('modalItemsList');
+            list.innerHTML = '';
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            const relevantIndices = category.items.map((item, idx) => ({ ...item, idx })).filter(item => item.date.startsWith(fiscalMonths[currentMonthIdx]));
+
+            if (relevantIndices.length === 0) {
+                list.innerHTML = `<div class="text-center text-slate-500 py-4">No entries for this month.</div>`;
+            }
+
+            relevantIndices.forEach(itemObj => {
+                const row = document.createElement('div');
+                row.className = "flex space-x-2 items-center bg-slate-800 p-2 rounded border border-slate-700";
+                row.innerHTML = `
+                    <input type="date" value="${itemObj.date}" onchange="updateItem(${itemObj.idx}, 'date', this.value)" class="bg-slate-900 text-white text-xs px-2 py-1 rounded border border-slate-600 cursor-pointer">
+                    <input type="text" value="${itemObj.name}" onchange="updateItem(${itemObj.idx}, 'name', this.value)" class="flex-1 bg-transparent text-white text-sm outline-none px-2" placeholder="Desc">
+                    <input type="number" value="${itemObj.val}" onchange="updateItem(${itemObj.idx}, 'val', this.value)" class="w-24 bg-transparent text-right text-emerald-400 font-mono font-bold outline-none" placeholder="0">
+                    <button onclick="deleteItem(${itemObj.idx})" class="text-slate-500 hover:text-red-500 px-2">×</button>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function addModalItem() {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            const defaultDate = fiscalMonths[currentMonthIdx] + '-01';
+            category.items.push({ name: '', val: 0, date: defaultDate });
+            if(window.saveToCloud) window.saveToCloud();
+            
+            // Re-render
+            const monthItems = category.items.filter(i => i.date.startsWith(fiscalMonths[currentMonthIdx]));
+            openModal(currentEditingId, currentEditingType); 
+        }
+        window.addModalItem = addModalItem;
+
+        function updateItem(realIndex, field, value) {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            if (field === 'val') value = parseInt(value) || 0;
+            category.items[realIndex][field] = value;
+            if(window.saveToCloud) window.saveToCloud();
+            
+            const monthItems = category.items.filter(i => i.date.startsWith(fiscalMonths[currentMonthIdx]));
+            const total = monthItems.reduce((s, i) => s + i.val, 0);
+            document.getElementById('modalTotal').textContent = '¥' + total.toLocaleString();
+        }
+        window.updateItem = updateItem;
+
+        function deleteItem(realIndex) {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            category.items.splice(realIndex, 1);
+            if(window.saveToCloud) window.saveToCloud();
+            openModal(currentEditingId, currentEditingType);
+        }
+        window.deleteItem = deleteItem;
+
+        function saveModalData() {
+            const newBudget = parseInt(document.getElementById('modalBudget').value) || 0;
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            if(category.type && monthlyPlans[currentMonthStr]) {
+                 monthlyPlans[currentMonthStr][category.type] = newBudget;
+            }
+            if(window.saveToCloud) window.saveToCloud();
+            closeModal();
+            renderMonthlyView();
+            updateGlobalHeader();
+        }
+        window.saveModalData = saveModalData;
+
+        function updateGlobalHeader() {
+            const totalRevPlan = fiscalMonths.reduce((sum, m) => {
+                return sum + getMonthlyBudget(m, 'l1_r') + getMonthlyBudget(m, 'l2_r') + getMonthlyBudget(m, 'l3_r');
+            }, 0);
+             const totalExpPlan = fiscalMonths.reduce((sum, m) => {
+                return sum + getMonthlyBudget(m, 'l1_e') + getMonthlyBudget(m, 'l2_e') + getMonthlyBudget(m, 'l3_e');
+            }, 0);
+            const projProfit = totalRevPlan - totalExpPlan;
+            const el = document.getElementById('globalProfit');
+            el.textContent = '¥' + projProfit.toLocaleString();
+            el.className = projProfit >= 0 ? "font-sci-fi font-bold text-2xl text-yellow-400" : "font-sci-fi font-bold text-2xl text-red-500";
+        }
+
+        // --- Categories ---
+        function openCategoryModal(type) {
+            document.getElementById('newCategoryType').value = type;
+            document.getElementById('newCategoryName').value = '';
+            document.getElementById('categoryModal').classList.remove('hidden');
+        }
+        window.openCategoryModal = openCategoryModal;
+
+        function closeCategoryModal() { document.getElementById('categoryModal').classList.add('hidden'); }
+        window.closeCategoryModal = closeCategoryModal;
+
+        function saveNewCategory() {
+            const type = document.getElementById('newCategoryType').value;
+            const name = document.getElementById('newCategoryName').value;
+            if (name) {
+                const newId = Date.now();
+                window.appState[currentLevel][type].push({ id: newId, name: name, type: `custom_${newId}`, items: []});
+                if(window.saveToCloud) window.saveToCloud();
+                renderMonthlyView();
+                closeCategoryModal();
+            }
+        }
+        window.saveNewCategory = saveNewCategory;
+
+        // Init
+        // Event listeners are mostly inline or added via logic
+    </script>
+</body>
+</html>

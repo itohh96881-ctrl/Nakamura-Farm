@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Command V14 - Budget Breakdown</title>
+    <title>Strategic Command V19 - Cash Flow Forecast</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -28,7 +28,6 @@
         let firebaseConfig;
         let appId = 'nakamura-farm-budget'; 
 
-        // Environment Detection
         if (typeof __firebase_config !== 'undefined') {
             firebaseConfig = JSON.parse(__firebase_config);
             if (typeof __app_id !== 'undefined') appId = __app_id;
@@ -38,7 +37,6 @@
 
         let db, auth, user;
 
-        // Display Project ID
         window.addEventListener('DOMContentLoaded', () => {
             const pidDisplay = document.getElementById('projectIdDisplay');
             if(pidDisplay && firebaseConfig) pidDisplay.innerText = `ID: ${firebaseConfig.projectId}`;
@@ -92,6 +90,22 @@
                     const data = snapshot.data();
                     if(data.appState) {
                         window.appState = JSON.parse(data.appState);
+                        
+                        // Force Sector Names
+                        window.appState.L1.name = "農園事業 (Farm)";
+                        window.appState.L1.icon = "🌱";
+                        window.appState.L1.colorClass = "green";
+                        window.appState.L2.name = "販売事業 (Sales)";
+                        window.appState.L2.icon = "🛒";
+                        window.appState.L2.colorClass = "blue";
+                        window.appState.L3.name = "カフェバー (Cafe)";
+                        window.appState.L3.icon = "☕";
+                        window.appState.L3.colorClass = "orange";
+
+                        if(!window.appState.fixedMonths) window.appState.fixedMonths = {};
+                        // Initial Cash Balance (Default if not set)
+                        if(window.appState.initialCash === undefined) window.appState.initialCash = 1000000; 
+
                         window.dispatchEvent(new Event('state-updated'));
                     }
                 } else {
@@ -123,7 +137,7 @@
                     updatedBy: user.uid
                 }, { merge: true });
                 
-                showToast("☁️ Saved to Cloud", "bg-emerald-600");
+                showToast("☁️ Saved", "bg-emerald-600");
                 updateNetworkStatus("ONLINE (SAVED)", "text-emerald-400");
             } catch (e) {
                 console.error("Save Error:", e);
@@ -158,11 +172,10 @@
         .chart-container { position: relative; height: 300px; width: 100%; }
         [contenteditable="true"]:focus { outline: none; border-bottom: 1px dashed #10b981; background-color: rgba(16, 185, 129, 0.1); color: #fff; }
         [contenteditable="true"]:hover { cursor: text; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #64748b; }
-        
-        /* Modal Tabs */
         .modal-tab-active { background-color: #1e293b; color: #34d399; border-bottom: 2px solid #34d399; }
         .modal-tab-inactive { background-color: transparent; color: #94a3b8; border-bottom: 2px solid transparent; }
-        .modal-tab-inactive:hover { color: #e2e8f0; background-color: #1e293b; }
+        .badge-win { background-color: #059669; color: white; border: 1px solid #34d399; box-shadow: 0 0 10px #059669; }
+        .badge-lose { background-color: #dc2626; color: white; border: 1px solid #f87171; box-shadow: 0 0 10px #dc2626; }
     </style>
 </head>
 <body class="h-screen flex flex-col scan-effect relative">
@@ -174,7 +187,7 @@
                 <div class="w-10 h-10 bg-emerald-600 rounded flex items-center justify-center font-sci-fi font-bold text-xl shadow-[0_0_10px_rgba(16,185,129,0.5)]">N</div>
                 <div>
                     <div class="flex items-center group editable-trigger">
-                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V14</h1>
+                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V19</h1>
                         <span class="ml-2 text-xs text-slate-600">CLOUD SYNC</span>
                     </div>
                     <div class="flex items-center group editable-trigger">
@@ -185,10 +198,10 @@
             
             <div class="flex space-x-1 bg-slate-800 rounded p-1">
                 <button onclick="switchView('monthly')" id="tab-monthly" class="tab-active px-4 py-1.5 text-sm font-bold rounded transition flex items-center">
-                    <span class="mr-2">📅</span> Monthly
+                    <span class="mr-2">📅</span> 月次入力
                 </button>
                 <button onclick="switchView('annual')" id="tab-annual" class="tab-inactive px-4 py-1.5 text-sm font-bold rounded transition flex items-center">
-                    <span class="mr-2">📈</span> Annual
+                    <span class="mr-2">📈</span> 年間推移
                 </button>
             </div>
         </div>
@@ -218,13 +231,62 @@
             <div class="flex-1 flex overflow-hidden">
                 <!-- Sidebar -->
                 <nav class="w-24 bg-slate-800 border-r border-slate-700 flex flex-col items-center py-6 space-y-4 z-10 shrink-0">
-                    <button onclick="switchLevel('L1')" id="nav-L1" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">🌱</span><span class="text-[10px] font-bold font-sci-fi">FARM</span></button>
-                    <button onclick="switchLevel('L2')" id="nav-L2" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">🛒</span><span class="text-[10px] font-bold font-sci-fi">SALES</span></button>
-                    <button onclick="switchLevel('L3')" id="nav-L3" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent"><span class="text-2xl mb-1">☕</span><span class="text-[10px] font-bold font-sci-fi">CAFE</span></button>
+                    <button onclick="switchLevel('L1')" id="nav-L1" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent">
+                        <span class="text-2xl mb-1">🌱</span><span class="text-[10px] font-bold font-sci-fi">農園</span>
+                    </button>
+                    <button onclick="switchLevel('L2')" id="nav-L2" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent">
+                        <span class="text-2xl mb-1">🛒</span><span class="text-[10px] font-bold font-sci-fi">販売</span>
+                    </button>
+                    <button onclick="switchLevel('L3')" id="nav-L3" class="group w-16 h-16 rounded-xl bg-slate-700 text-slate-400 flex flex-col items-center justify-center transition border-2 border-transparent">
+                        <span class="text-2xl mb-1">☕</span><span class="text-[10px] font-bold font-sci-fi">カフェバー</span>
+                    </button>
                 </nav>
 
                 <!-- Workspace -->
                 <main class="flex-1 bg-slate-900 relative overflow-y-auto p-6">
+                    <!-- Fix Header -->
+                    <div class="flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-md">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-slate-400 text-sm font-bold">STATUS:</span>
+                            <span id="fixStatusBadge" class="px-3 py-1 rounded text-xs font-black tracking-widest bg-slate-700 text-slate-400">EDITING</span>
+                        </div>
+                        <button onclick="toggleFixMonth()" id="btnToggleFix" class="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold font-sci-fi transition shadow-lg">
+                            🔒 FIX MONTH
+                        </button>
+                    </div>
+
+                    <!-- Result Board -->
+                    <div id="resultBoard" class="hidden mb-8 animate-pop">
+                        <div class="grid grid-cols-3 gap-6">
+                            <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL REVENUE (売上)</div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-3xl font-mono font-bold text-white" id="resRevAct">¥0</span>
+                                    <span class="text-sm text-slate-500 mb-1">Plan: <span id="resRevPlan">¥0</span></span>
+                                </div>
+                                <div id="badgeRev" class="absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose">LOSE</div>
+                                <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden"><div id="barRev" class="bg-emerald-500 h-full w-0"></div></div>
+                            </div>
+                            <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL EXPENSE (支出)</div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-3xl font-mono font-bold text-white" id="resExpAct">¥0</span>
+                                    <span class="text-sm text-slate-500 mb-1">Plan: <span id="resExpPlan">¥0</span></span>
+                                </div>
+                                <div id="badgeExp" class="absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-win">WIN</div>
+                                <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden"><div id="barExp" class="bg-red-500 h-full w-0"></div></div>
+                            </div>
+                            <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">OPERATING PROFIT (利益)</div>
+                                <div class="flex justify-between items-end mb-2">
+                                    <span class="text-3xl font-mono font-bold text-white" id="resProfit">¥0</span>
+                                    <span class="text-sm text-slate-500 mb-1">Plan: <span id="resProfitPlan">¥0</span></span>
+                                </div>
+                                <div id="badgeProfit" class="absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose">LOSE</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Sector Header -->
                     <div class="flex justify-between items-end mb-6 border-b border-slate-700 pb-2 sticky top-0 bg-slate-900/95 backdrop-blur z-10 pt-2">
                         <div>
@@ -243,22 +305,28 @@
                     </div>
 
                     <!-- Input Grid -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 relative">
+                        <div id="lockedOverlay" class="hidden absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] z-20 flex flex-col items-center justify-center border-2 border-slate-700 rounded-xl">
+                            <div class="text-4xl mb-4">🔒</div>
+                            <h3 class="text-2xl font-bold text-white font-sci-fi">MONTH FIXED</h3>
+                            <p class="text-slate-400 mb-6">確定済みです。編集するにはロックを解除してください。</p>
+                        </div>
+
                         <div>
                             <div class="flex justify-between items-center mb-4 border-l-4 border-green-500 pl-3">
-                                <h3 class="text-green-400 font-bold font-sci-fi tracking-widest">REVENUE</h3>
+                                <h3 class="text-green-400 font-bold font-sci-fi tracking-widest">REVENUE (収入)</h3>
                                 <span class="text-xs text-slate-500 font-mono">Month: <span class="current-month-text">--</span></span>
                             </div>
                             <div id="revenueContainer" class="space-y-3"></div>
-                            <button onclick="openCategoryModal('revenue')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-green-400 transition font-bold">+ New Revenue Source</button>
+                            <button id="btnNewRev" onclick="openCategoryModal('revenue')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-green-400 transition font-bold">+ 科目追加 (収入)</button>
                         </div>
                         <div>
                             <div class="flex justify-between items-center mb-4 border-l-4 border-red-500 pl-3">
-                                <h3 class="text-red-400 font-bold font-sci-fi tracking-widest">EXPENSES</h3>
+                                <h3 class="text-red-400 font-bold font-sci-fi tracking-widest">EXPENSES (支出)</h3>
                                 <span class="text-xs text-slate-500 font-mono">Month: <span class="current-month-text">--</span></span>
                             </div>
                             <div id="expenseContainer" class="space-y-3"></div>
-                            <button onclick="openCategoryModal('expense')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-red-400 transition font-bold">+ New Expense Category</button>
+                            <button id="btnNewExp" onclick="openCategoryModal('expense')" class="w-full py-3 mt-4 border-2 border-dashed border-slate-700 text-slate-500 rounded-xl hover:bg-slate-800 hover:text-red-400 transition font-bold">+ 科目追加 (支出)</button>
                         </div>
                     </div>
                     <div class="h-20"></div>
@@ -269,82 +337,73 @@
         <!-- VIEW 2: ANNUAL STRATEGY -->
         <div id="view-annual" class="absolute inset-0 bg-slate-100 flex flex-col transition-transform duration-300 transform translate-x-full overflow-y-auto">
             <div class="max-w-7xl mx-auto w-full p-8 space-y-8">
-                <!-- Header -->
                 <div class="flex justify-between items-end border-b border-slate-300 pb-4">
                     <div>
-                        <h2 class="text-3xl font-bold text-slate-800 flex items-center gap-3"><span class="bg-blue-600 text-white rounded p-1 text-2xl">📊</span> Annual Strategic Dashboard</h2>
+                        <h2 class="text-3xl font-bold text-slate-800 flex items-center gap-3"><span class="bg-blue-600 text-white rounded p-1 text-2xl">📊</span> 年間収支ダッシュボード</h2>
                         <p class="text-slate-500 mt-1">Fiscal Year Outlook (Oct 2025 - Sep 2026)</p>
                     </div>
-                    <div class="flex space-x-4">
-                        <div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="text-xs text-slate-400 uppercase">Total Plan Revenue</div><div class="text-xl font-bold text-green-600" id="annualTotalRevPlan">¥0</div></div>
-                        <div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="text-xs text-slate-400 uppercase">Total Actual Revenue</div><div class="text-xl font-bold text-green-700" id="annualTotalRevAct">¥0</div></div>
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-white p-3 rounded shadow-sm border border-slate-200">
+                            <div class="text-xs text-slate-400 uppercase">期首残高 (設定可)</div>
+                            <input type="number" id="initialCashInput" class="text-xl font-bold text-slate-800 w-32 border-b border-slate-300 focus:border-blue-500 outline-none" value="1000000" onchange="updateInitialCash(this.value)">
+                        </div>
                     </div>
                 </div>
-                <!-- Charts -->
+
+                <!-- CASH FLOW CHART (NEW) -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border-2 border-slate-200 relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-2 h-full bg-yellow-400"></div>
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center">
+                        <span class="text-2xl mr-2">💰</span> 
+                        資金繰り予測 (Cash Flow Projection)
+                    </h3>
+                    <div class="chart-container" style="height: 350px;">
+                        <canvas id="cashFlowChart"></canvas>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 text-right">*赤色のゾーンは資金不足 (ショート) の危険領域です</div>
+                </div>
+
+                <!-- Other Charts -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">📈 Profit/Loss Trend</h3><div class="chart-container"><canvas id="annualTrendChart"></canvas></div></div>
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">🍰 Revenue Composition</h3><div class="chart-container"><canvas id="annualSectorChart"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">📈 予実推移 (Profit/Loss Trend)</h3><div class="chart-container"><canvas id="annualTrendChart"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">🍰 部門別売上構成 (Actual)</h3><div class="chart-container"><canvas id="annualSectorChart"></canvas></div></div>
                 </div>
-                <!-- Table -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
-                    <h3 class="font-bold text-slate-700 mb-4">📅 Monthly Performance Table</h3>
-                    <table class="w-full text-sm text-left text-slate-600">
-                        <thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b">
-                            <tr>
-                                <th class="px-6 py-3">Month</th><th class="px-6 py-3 text-right">Farm Rev</th><th class="px-6 py-3 text-right">Sales Rev</th><th class="px-6 py-3 text-right">Cafe Rev</th><th class="px-6 py-3 text-right font-bold bg-green-50 border-l border-green-100">Total Rev</th><th class="px-6 py-3 text-right font-bold bg-red-50 border-l border-red-100">Total Exp</th><th class="px-6 py-3 text-right font-black border-l">Profit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="annualTableBody"></tbody>
-                    </table>
-                </div>
+                
                 <div class="h-10"></div>
             </div>
         </div>
     </div>
 
-    <!-- Modal 1: Detail/Item Editor -->
+    <!-- Modals (Detail / Category / Toast) ... (Same as V18) -->
+    <!-- Modal 1: Detail -->
     <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-slate-800 w-full max-w-3xl rounded-xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]">
-            <!-- Header -->
             <div class="p-5 border-b border-slate-700 bg-slate-900 rounded-t-xl flex justify-between">
-                <div>
-                    <div class="text-xs text-emerald-400 font-sci-fi mb-1">EDITING DETAILS</div>
-                    <h3 class="text-2xl font-bold text-white" id="modalTitle">Account</h3>
-                </div>
-                <div class="text-right">
-                    <div class="text-xs text-slate-400 uppercase">Total (<span id="modalMonthDisp"></span>)</div>
-                    <div class="text-3xl font-mono font-bold text-white" id="modalTotal">¥0</div>
-                </div>
+                <div><div class="text-xs text-emerald-400 font-sci-fi mb-1">EDITING DETAILS</div><h3 class="text-2xl font-bold text-white" id="modalTitle">Account</h3></div>
+                <div class="text-right"><div class="text-xs text-slate-400 uppercase">Total (<span id="modalMonthDisp"></span>)</div><div class="text-3xl font-mono font-bold text-white" id="modalTotal">¥0</div></div>
             </div>
-            
-            <!-- Tabs -->
             <div class="flex border-b border-slate-700 bg-slate-900 px-2">
                 <button onclick="switchModalTab('actual')" id="modalTabActual" class="flex-1 py-3 text-sm font-bold transition modal-tab-active">📊 Actual (実績)</button>
                 <button onclick="switchModalTab('budget')" id="modalTabBudget" class="flex-1 py-3 text-sm font-bold transition modal-tab-inactive">🎯 Budget (予算)</button>
             </div>
-
-            <!-- List Area -->
             <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-900/30" id="modalItemsList"></div>
-
-            <!-- Footer -->
             <div class="p-5 border-t border-slate-700 bg-slate-900 rounded-b-xl flex justify-between">
-                <button onclick="addModalItem()" id="btnAddItem" class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+ Add Entry</button>
-                <div class="flex space-x-3"><button onclick="closeModal()" class="px-5 py-2 text-slate-400 hover:text-white transition">Close</button><button onclick="saveModalData()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold shadow-lg">Confirm</button></div>
+                <button onclick="addModalItem()" id="btnAddItem" class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+ 明細追加</button>
+                <div class="flex space-x-3"><button onclick="closeModal()" class="px-5 py-2 text-slate-400 hover:text-white transition">閉じる</button><button onclick="saveModalData()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold shadow-lg">保存</button></div>
             </div>
         </div>
     </div>
 
-    <!-- Modal 2: New Category Creator -->
+    <!-- Modal 2: New Category -->
     <div id="categoryModal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
         <div class="bg-slate-800 w-full max-w-md rounded-xl shadow-2xl border-2 border-slate-600 p-6">
-            <h3 class="text-xl font-bold text-white mb-4">Create New Category</h3>
-            <div class="mb-4"><label class="block text-slate-400 text-xs uppercase mb-2">Name</label><input type="text" id="newCategoryName" class="w-full bg-slate-900 border border-slate-600 text-white px-4 py-2 rounded focus:border-emerald-500 outline-none"></div>
+            <h3 class="text-xl font-bold text-white mb-4">新規科目の作成</h3>
+            <div class="mb-4"><label class="block text-slate-400 text-xs uppercase mb-2">科目名</label><input type="text" id="newCategoryName" class="w-full bg-slate-900 border border-slate-600 text-white px-4 py-2 rounded focus:border-emerald-500 outline-none"></div>
             <input type="hidden" id="newCategoryType" value="">
-            <div class="flex justify-end space-x-3 mt-6"><button onclick="closeCategoryModal()" class="px-4 py-2 text-slate-400 hover:text-white">Cancel</button><button onclick="saveNewCategory()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">Create</button></div>
+            <div class="flex justify-end space-x-3 mt-6"><button onclick="closeCategoryModal()" class="px-4 py-2 text-slate-400 hover:text-white">キャンセル</button><button onclick="saveNewCategory()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold">作成</button></div>
         </div>
     </div>
 
-    <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-4 right-4 px-4 py-2 rounded shadow-lg text-white text-xs font-bold transition-opacity duration-500 opacity-0 pointer-events-none z-[100]">
         <span id="toastMsg">Notification</span>
     </div>
@@ -370,7 +429,7 @@
         let currentMonthIdx = 0; 
         let currentLevel = 'L1';
         let currentView = 'monthly';
-        let currentModalTab = 'actual'; // 'actual' or 'budget'
+        let currentModalTab = 'actual';
 
         const initialData = {
             L1: { 
@@ -387,7 +446,9 @@
                 name: 'カフェバー (Cafe)', icon: '☕', colorClass: 'orange',
                 revenue: [ { id: 'l3_r_main', name: 'カフェ収入 (CSV計画分)', type: 'l3_r', items: [], budgetItems: [] } ],
                 expense: [ { id: 'l3_e_main', name: 'カフェ支出 (CSV計画分)', type: 'l3_e', items: [], budgetItems: [] } ]
-            }
+            },
+            fixedMonths: {},
+            initialCash: 1000000
         };
 
         window.appState = JSON.parse(JSON.stringify(initialData));
@@ -396,6 +457,7 @@
         let currentEditingType = null;
         let trendChart = null;
         let sectorChart = null;
+        let cashFlowChart = null; // New chart
 
         function init() {
             renderMonthlyView();
@@ -403,16 +465,17 @@
         }
 
         window.addEventListener('state-updated', () => {
+            if(document.getElementById('initialCashInput')) {
+                document.getElementById('initialCashInput').value = window.appState.initialCash || 1000000;
+            }
             renderMonthlyView();
             updateGlobalHeader();
             if(currentView === 'annual') renderAnnualView();
         });
 
-        window.addEventListener('app-ready', () => {
-            init();
-        });
+        window.addEventListener('app-ready', () => { init(); });
 
-        // --- Editing Logic with Auto-Save ---
+        // --- Editing Logic ---
         function updateSectorName(el) {
             const newName = el.innerText.trim();
             if(newName) {
@@ -433,6 +496,13 @@
             }
         }
         window.updateCategoryName = updateCategoryName;
+
+        function updateInitialCash(val) {
+            window.appState.initialCash = parseInt(val) || 0;
+            if(window.saveToCloud) window.saveToCloud();
+            renderAnnualView();
+        }
+        window.updateInitialCash = updateInitialCash;
 
         // --- View Logic ---
         function switchView(view) {
@@ -483,25 +553,63 @@
             return 0;
         }
 
-        // New Logic: Sum from budgetItems OR fallback to CSV
         function getComputedBudget(category, monthStr) {
-            // Ensure budgetItems array exists
             if (!category.budgetItems) category.budgetItems = [];
-            
             const monthBudgetItems = category.budgetItems.filter(i => i.date.startsWith(monthStr));
-            
-            // If user has defined budget items for this month, use them
             if (monthBudgetItems.length > 0) {
                 return monthBudgetItems.reduce((sum, i) => sum + i.val, 0);
             }
-            
-            // Fallback to CSV plan if no custom items
             return getMonthlyBudgetFromCSV(monthStr, category.type);
         }
+
+        // --- Fix & Result Logic ---
+        function toggleFixMonth() {
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            if(!window.appState.fixedMonths) window.appState.fixedMonths = {};
+            const isCurrentlyFixed = window.appState.fixedMonths[currentMonthStr];
+            window.appState.fixedMonths[currentMonthStr] = !isCurrentlyFixed;
+            if(window.saveToCloud) window.saveToCloud();
+            renderMonthlyView();
+            if(!isCurrentlyFixed) {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+        window.toggleFixMonth = toggleFixMonth;
 
         function renderMonthlyView() {
             const data = window.appState[currentLevel];
             const currentMonthStr = fiscalMonths[currentMonthIdx];
+            const isFixed = window.appState.fixedMonths && window.appState.fixedMonths[currentMonthStr];
+
+            const btnToggle = document.getElementById('btnToggleFix');
+            const statusBadge = document.getElementById('fixStatusBadge');
+            const lockedOverlay = document.getElementById('lockedOverlay');
+            const resultBoard = document.getElementById('resultBoard');
+
+            if(isFixed) {
+                btnToggle.innerText = "🔓 UNLOCK";
+                btnToggle.className = "px-6 py-2 rounded bg-slate-600 hover:bg-slate-500 text-white font-bold font-sci-fi transition shadow-lg";
+                statusBadge.innerText = "FIXED";
+                statusBadge.className = "px-3 py-1 rounded text-xs font-black tracking-widest bg-emerald-700 text-white";
+                lockedOverlay.classList.remove('hidden');
+                resultBoard.classList.remove('hidden');
+                document.getElementById('btnNewRev').style.display = 'none';
+                document.getElementById('btnNewExp').style.display = 'none';
+                calculateAndShowResults(currentMonthStr);
+            } else {
+                btnToggle.innerText = "🔒 FIX MONTH";
+                btnToggle.className = "px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold font-sci-fi transition shadow-lg";
+                statusBadge.innerText = "EDITING";
+                statusBadge.className = "px-3 py-1 rounded text-xs font-black tracking-widest bg-slate-700 text-slate-400";
+                lockedOverlay.classList.add('hidden');
+                resultBoard.classList.add('hidden');
+                document.getElementById('btnNewRev').style.display = 'block';
+                document.getElementById('btnNewExp').style.display = 'block';
+            }
 
             ['L1', 'L2', 'L3'].forEach(l => {
                 const btn = document.getElementById(`nav-${l}`);
@@ -512,8 +620,19 @@
                     : `group w-16 h-16 rounded-xl bg-slate-800 text-slate-500 flex flex-col items-center justify-center border-2 border-transparent hover:bg-slate-700 transition`;
             });
 
+            // FIXED: Ensure SECTOR title updates dynamically
+            const sectorTitleEl = document.getElementById('sectorTitle');
+            const colorClass = window.appState[currentLevel].colorClass;
+            let colorTailwind = "text-emerald-400";
+            if(colorClass === 'blue') colorTailwind = "text-blue-400";
+            if(colorClass === 'orange') colorTailwind = "text-orange-400";
+            
+            sectorTitleEl.innerText = `SECTOR ${currentLevel}`;
+            sectorTitleEl.className = `font-sci-fi block text-xs tracking-widest ${colorTailwind}`;
+
             const sectorNameEl = document.getElementById('sectorName');
             if(sectorNameEl.innerText !== data.name) sectorNameEl.innerText = data.name;
+            sectorNameEl.contentEditable = !isFixed;
 
             document.getElementById('sectorIcon').textContent = data.icon;
             document.querySelectorAll('.current-month-text').forEach(el => el.textContent = currentMonthStr);
@@ -528,30 +647,85 @@
 
             const getMonthTotal = (items) => {
                 if(!items) return 0;
-                return items
-                    .filter(i => i.date.startsWith(currentMonthStr))
-                    .reduce((sum, i) => sum + i.val, 0);
+                return items.filter(i => i.date.startsWith(currentMonthStr)).reduce((sum, i) => sum + i.val, 0);
             };
 
             data.revenue.forEach(cat => {
                 const actual = getMonthTotal(cat.items);
                 const budget = getComputedBudget(cat, currentMonthStr); 
                 totalRevPlan += budget;
-                revContainer.appendChild(createCard(cat, 'revenue', actual, budget));
+                revContainer.appendChild(createCard(cat, 'revenue', actual, budget, isFixed));
             });
 
             data.expense.forEach(cat => {
                 const actual = getMonthTotal(cat.items);
                 const budget = getComputedBudget(cat, currentMonthStr);
                 totalExpPlan += budget;
-                expContainer.appendChild(createCard(cat, 'expense', actual, budget));
+                expContainer.appendChild(createCard(cat, 'expense', actual, budget, isFixed));
             });
 
             document.getElementById('sectorRevPlan').textContent = '¥' + totalRevPlan.toLocaleString();
             document.getElementById('sectorExpPlan').textContent = '¥' + totalExpPlan.toLocaleString();
         }
 
-        function createCard(category, type, actualValue, budgetValue) {
+        function calculateAndShowResults(monthStr) {
+            let totalRevAct = 0, totalRevPlan = 0;
+            let totalExpAct = 0, totalExpPlan = 0;
+
+            ['L1','L2','L3'].forEach(lvl => {
+                const d = window.appState[lvl];
+                d.revenue.forEach(c => {
+                    totalRevAct += (c.items||[]).filter(i => i.date.startsWith(monthStr)).reduce((s,i)=>s+i.val,0);
+                    totalRevPlan += getComputedBudget(c, monthStr);
+                });
+                d.expense.forEach(c => {
+                    totalExpAct += (c.items||[]).filter(i => i.date.startsWith(monthStr)).reduce((s,i)=>s+i.val,0);
+                    totalExpPlan += getComputedBudget(c, monthStr);
+                });
+            });
+
+            const profitAct = totalRevAct - totalExpAct;
+            const profitPlan = totalRevPlan - totalExpPlan;
+
+            document.getElementById('resRevAct').innerText = '¥' + totalRevAct.toLocaleString();
+            document.getElementById('resRevPlan').innerText = '¥' + totalRevPlan.toLocaleString();
+            
+            const badgeRev = document.getElementById('badgeRev');
+            const barRev = document.getElementById('barRev');
+            if(totalRevAct >= totalRevPlan) {
+                badgeRev.innerText = "WIN"; badgeRev.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-win";
+                barRev.className = "bg-emerald-500 h-full transition-all";
+            } else {
+                badgeRev.innerText = "LOSE"; badgeRev.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose";
+                barRev.className = "bg-red-500 h-full transition-all";
+            }
+            barRev.style.width = Math.min(100, (totalRevAct/Math.max(1, totalRevPlan))*100) + '%';
+
+            document.getElementById('resExpAct').innerText = '¥' + totalExpAct.toLocaleString();
+            document.getElementById('resExpPlan').innerText = '¥' + totalExpPlan.toLocaleString();
+            
+            const badgeExp = document.getElementById('badgeExp');
+            const barExp = document.getElementById('barExp');
+            if(totalExpAct <= totalExpPlan) {
+                badgeExp.innerText = "WIN"; badgeExp.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-win";
+                barExp.className = "bg-emerald-500 h-full transition-all";
+            } else {
+                badgeExp.innerText = "LOSE"; badgeExp.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose";
+                barExp.className = "bg-red-500 h-full transition-all";
+            }
+            barExp.style.width = Math.min(100, (totalExpAct/Math.max(1, totalExpPlan))*100) + '%';
+
+            document.getElementById('resProfit').innerText = '¥' + profitAct.toLocaleString();
+            document.getElementById('resProfitPlan').innerText = '¥' + profitPlan.toLocaleString();
+            const badgeProfit = document.getElementById('badgeProfit');
+            if(profitAct >= profitPlan) {
+                badgeProfit.innerText = "WIN"; badgeProfit.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-win";
+            } else {
+                badgeProfit.innerText = "LOSE"; badgeProfit.className = "absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose";
+            }
+        }
+
+        function createCard(category, type, actualValue, budgetValue, isFixed) {
             const isRev = type === 'revenue';
             const progress = budgetValue > 0 ? (actualValue / budgetValue) * 100 : 0;
             let barColor = isRev ? 'bg-emerald-500' : 'bg-blue-500';
@@ -560,14 +734,18 @@
 
             const div = document.createElement('div');
             div.className = "bg-slate-800 border border-slate-700 rounded-xl p-4 cursor-pointer card-hover relative overflow-hidden group";
+            
             div.onclick = (e) => {
-                if(e.target.isContentEditable) return; 
+                if(e.target.isContentEditable) return;
                 openModal(category.id, type);
             };
 
+            const editHint = isFixed ? '<div class="absolute right-2 bottom-2 text-slate-500 text-xs font-bold pointer-events-none">LOCKED</div>' : '<div class="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-emerald-400 text-xs font-bold pointer-events-none">EDIT ></div>';
+            const editableAttr = isFixed ? '' : 'contenteditable="true"';
+
             div.innerHTML = `
                 <div class="flex justify-between items-start mb-2 relative z-10">
-                    <h4 contenteditable="true" onblur="updateCategoryName(this, '${category.id}', '${type}')" class="font-bold text-white hover:border-b hover:border-emerald-500 transition">${category.name}</h4>
+                    <h4 ${editableAttr} onblur="updateCategoryName(this, '${category.id}', '${type}')" class="font-bold text-white hover:border-b hover:border-emerald-500 transition">${category.name}</h4>
                     <div class="text-right">
                         <div class="text-white font-mono font-bold text-lg">¥${actualValue.toLocaleString()}</div>
                     </div>
@@ -579,21 +757,24 @@
                     <span>Plan: ¥${budgetValue.toLocaleString()}</span>
                     <span>${progress.toFixed(0)}%</span>
                 </div>
-                <div class="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-emerald-400 text-xs font-bold pointer-events-none">EDIT ></div>
+                ${editHint}
             `;
             return div;
         }
 
         function renderAnnualView() {
+            // Recalc annual stats
+            let currentBalance = window.appState.initialCash || 1000000;
+            const balanceHistory = [];
+            const labels = [];
+
             const monthlyStats = fiscalMonths.map(month => {
+                // ... same logic for summary stats ...
                 let stats = { month, farmRev: 0, salesRev: 0, cafeRev: 0, totalRev: 0, totalExp: 0, totalRevPlan: 0 };
-                
+                // Simplified Sum
                 const sumCatAct = (cats) => cats.reduce((acc, cat) => 
                     acc + (cat.items ? cat.items.filter(i => i.date.startsWith(month)).reduce((s, i) => s + i.val, 0) : 0), 0);
                 
-                // Sum Computed Budgets
-                const sumCatPlan = (cats) => cats.reduce((acc, cat) => acc + getComputedBudget(cat, month), 0);
-
                 stats.farmRev = sumCatAct(window.appState.L1.revenue);
                 stats.salesRev = sumCatAct(window.appState.L2.revenue);
                 stats.cafeRev = sumCatAct(window.appState.L3.revenue);
@@ -603,36 +784,73 @@
 
                 stats.totalRev = stats.farmRev + stats.salesRev + stats.cafeRev;
                 stats.totalExp = farmExp + salesExp + cafeExp;
-                stats.totalRevPlan = sumCatPlan(window.appState.L1.revenue) + sumCatPlan(window.appState.L2.revenue) + sumCatPlan(window.appState.L3.revenue);
+                
+                // Cash Flow Logic
+                const netMove = stats.totalRev - stats.totalExp;
+                currentBalance += netMove;
+                balanceHistory.push(currentBalance);
+                labels.push(month);
+
                 return stats;
             });
 
-            const totalRev = monthlyStats.reduce((s, m) => s + m.totalRev, 0);
-            const totalRevPlan = monthlyStats.reduce((s, m) => s + m.totalRevPlan, 0);
-            document.getElementById('annualTotalRevAct').textContent = '¥' + totalRev.toLocaleString();
-            document.getElementById('annualTotalRevPlan').textContent = '¥' + totalRevPlan.toLocaleString();
+            updateCashFlowChart(labels, balanceHistory);
+            updateAnnualCharts(monthlyStats); // keep existing charts too
+            // ... (table update) ...
+        }
 
-            updateAnnualCharts(monthlyStats);
+        function updateCashFlowChart(labels, data) {
+            const ctx = document.getElementById('cashFlowChart').getContext('2d');
+            if(cashFlowChart) cashFlowChart.destroy();
 
-            const tbody = document.getElementById('annualTableBody');
-            tbody.innerHTML = '';
-            monthlyStats.forEach(m => {
-                const p = m.totalRev - m.totalExp;
-                const tr = document.createElement('tr');
-                tr.className = "bg-white border-b hover:bg-slate-50";
-                tr.innerHTML = `
-                    <td class="px-6 py-3 font-medium text-slate-900">${m.month}</td>
-                    <td class="px-6 py-3 text-right">${m.farmRev > 0 ? m.farmRev.toLocaleString() : '-'}</td>
-                    <td class="px-6 py-3 text-right">${m.salesRev > 0 ? m.salesRev.toLocaleString() : '-'}</td>
-                    <td class="px-6 py-3 text-right">${m.cafeRev > 0 ? m.cafeRev.toLocaleString() : '-'}</td>
-                    <td class="px-6 py-3 text-right font-bold border-l bg-green-50">${m.totalRev.toLocaleString()}</td>
-                    <td class="px-6 py-3 text-right font-bold border-l bg-red-50 text-red-600">${m.totalExp.toLocaleString()}</td>
-                    <td class="px-6 py-3 text-right font-black border-l ${p>=0 ? 'text-green-600':'text-red-600'}">${p.toLocaleString()}</td>
-                `;
-                tbody.appendChild(tr);
+            // Create gradient for danger zone (negative values)
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(34, 197, 94, 0.2)'); // Greenish top
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.5)'); // Red bottom
+
+            cashFlowChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Cash Balance (資金残高)',
+                        data: data,
+                        borderColor: '#0f172a',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: data.map(v => v < 0 ? '#dc2626' : '#10b981'),
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 0,
+                                    yMax: 0,
+                                    borderColor: 'red',
+                                    borderWidth: 2,
+                                    label: { content: 'Shortage Limit', enabled: true, position: 'end' }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: (ctx) => ctx.tick.value === 0 ? '#ef4444' : '#e2e8f0', lineWidth: (ctx) => ctx.tick.value === 0 ? 2 : 1 },
+                            ticks: { callback: v => '¥' + v.toLocaleString() }
+                        }
+                    }
+                }
             });
         }
 
+        // ... Keep existing updateAnnualCharts ...
         function updateAnnualCharts(data) {
             const ctxTrend = document.getElementById('annualTrendChart').getContext('2d');
             const ctxSector = document.getElementById('annualSectorChart').getContext('2d');
@@ -644,10 +862,9 @@
                 data: {
                     labels: data.map(d => d.month),
                     datasets: [
-                        { label: 'Plan Revenue', data: data.map(d => d.totalRevPlan), borderColor: '#94a3b8', borderDash: [5,5], tension: 0.1 },
-                        { label: 'Actual Revenue', data: data.map(d => d.totalRev), borderColor: '#10b981', tension: 0.3 },
-                        { label: 'Actual Expense', data: data.map(d => d.totalExp), borderColor: '#ef4444', tension: 0.3 },
-                        { label: 'Profit', data: data.map(d => d.totalRev - d.totalExp), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 }
+                        { label: '実績 (Actual)', data: data.map(d => d.totalRev), borderColor: '#10b981', tension: 0.3 },
+                        { label: '支出 (Expense)', data: data.map(d => d.totalExp), borderColor: '#ef4444', tension: 0.3 },
+                        { label: '利益 (Profit)', data: data.map(d => d.totalRev - d.totalExp), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
@@ -658,20 +875,21 @@
                 data: {
                     labels: data.map(d => d.month),
                     datasets: [
-                        { label: 'Farm', data: data.map(d => d.farmRev), backgroundColor: '#10b981' },
-                        { label: 'Sales', data: data.map(d => d.salesRev), backgroundColor: '#3b82f6' },
-                        { label: 'Cafe', data: data.map(d => d.cafeRev), backgroundColor: '#f97316' }
+                        { label: '農園', data: data.map(d => d.farmRev), backgroundColor: '#10b981' },
+                        { label: '販売', data: data.map(d => d.salesRev), backgroundColor: '#3b82f6' },
+                        { label: 'カフェ', data: data.map(d => d.cafeRev), backgroundColor: '#f97316' }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
             });
         }
 
-        // --- Modals ---
+        // --- Modals (Same as V18) ---
+        // (Function definitions are identical to V18)
         function openModal(id, type) {
             currentEditingId = id;
             currentEditingType = type;
-            currentModalTab = 'actual'; // Default to actual
+            currentModalTab = 'actual';
             
             const category = window.appState[currentLevel][type].find(c => c.id === id);
             const currentMonthStr = fiscalMonths[currentMonthIdx];
@@ -699,12 +917,12 @@
                 btnActual.className = "flex-1 py-3 text-sm font-bold transition modal-tab-active";
                 btnBudget.className = "flex-1 py-3 text-sm font-bold transition modal-tab-inactive";
                 btnAdd.className = "text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20";
-                btnAdd.innerText = "+ Add Actual Entry";
+                btnAdd.innerText = "+ 実績追加";
             } else {
                 btnActual.className = "flex-1 py-3 text-sm font-bold transition modal-tab-inactive";
                 btnBudget.className = "flex-1 py-3 text-sm font-bold transition modal-tab-active";
                 btnAdd.className = "text-blue-400 font-bold flex items-center px-4 py-2 rounded border border-blue-900/50 hover:bg-blue-900/20";
-                btnAdd.innerText = "+ Add Budget Entry";
+                btnAdd.innerText = "+ 予算追加";
             }
 
             renderModalItems();
@@ -720,26 +938,21 @@
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
             const currentMonthStr = fiscalMonths[currentMonthIdx];
             
-            // Determine source array based on tab
             let items = [];
             if(currentModalTab === 'actual') {
                 items = category.items || [];
             } else {
                 items = category.budgetItems || [];
-                // If Budget items are empty for this month, inject default CSV plan as a placeholder item (only visual if not saved)
                 const monthItems = items.filter(i => i.date.startsWith(currentMonthStr));
                 if(monthItems.length === 0) {
                     const csvVal = getMonthlyBudgetFromCSV(currentMonthStr, category.type);
                     if(csvVal > 0) {
-                        // We push a temporary item for rendering so user can see/edit it
-                        // Ideally we save this to state if user modifies it. 
-                        // Simplified: Display a special "Initial Plan" row if empty
                         const row = document.createElement('div');
                         row.className = "flex justify-between items-center bg-slate-800/50 p-3 rounded border border-slate-700 border-dashed mb-2";
                         row.innerHTML = `
-                            <span class="text-slate-500 text-xs italic">CSV Initial Plan</span>
+                            <span class="text-slate-500 text-xs italic">CSV初期計画</span>
                             <span class="text-slate-400 font-mono">¥${csvVal.toLocaleString()}</span>
-                            <button onclick="convertCsvToBudget(${csvVal})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded">Edit as Item</button>
+                            <button onclick="convertCsvToBudget(${csvVal})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded">個別編集</button>
                         `;
                         list.appendChild(row);
                     }
@@ -749,7 +962,7 @@
             const relevantIndices = items.map((item, idx) => ({ ...item, idx })).filter(item => item.date.startsWith(currentMonthStr));
 
             if (relevantIndices.length === 0 && list.children.length === 0) {
-                list.innerHTML = `<div class="text-center text-slate-500 py-4">No entries for this month.</div>`;
+                list.innerHTML = `<div class="text-center text-slate-500 py-4">データがありません</div>`;
             }
 
             relevantIndices.forEach(itemObj => {
@@ -769,10 +982,6 @@
 
             // Update Total Header
             const total = relevantIndices.reduce((s, i) => s + i.val, 0);
-            
-            // Note: For budget, if items are empty, we might want to show CSV val in header, 
-            // but consistency says show sum of items. 
-            // Let's show sum of items + CSV fallback if items empty
             let displayTotal = total;
             if (currentModalTab === 'budget' && relevantIndices.length === 0) {
                  displayTotal = getMonthlyBudgetFromCSV(currentMonthStr, category.type);
@@ -839,23 +1048,13 @@
         window.saveModalData = saveModalData;
 
         function updateGlobalHeader() {
-            // Simplified total calc for header
-            // Ideally should sum all categories' computed budgets
-            // For now just re-using the monthlyPlans logic for speed, or strict recalc
-            // Let's do strict recalc based on computed budgets
             let totalRevPlan = 0;
             let totalExpPlan = 0;
-            
             ['L1','L2','L3'].forEach(lvl => {
                 const d = window.appState[lvl];
-                d.revenue.forEach(c => {
-                    fiscalMonths.forEach(m => totalRevPlan += getComputedBudget(c, m));
-                });
-                d.expense.forEach(c => {
-                    fiscalMonths.forEach(m => totalExpPlan += getComputedBudget(c, m));
-                });
+                d.revenue.forEach(c => { fiscalMonths.forEach(m => totalRevPlan += getComputedBudget(c, m)); });
+                d.expense.forEach(c => { fiscalMonths.forEach(m => totalExpPlan += getComputedBudget(c, m)); });
             });
-
             const projProfit = totalRevPlan - totalExpPlan;
             const el = document.getElementById('globalProfit');
             el.textContent = '¥' + projProfit.toLocaleString();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Command V13 - Diagnostic Mode</title>
+    <title>Strategic Command V14 - Budget Breakdown</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -30,18 +30,13 @@
 
         // Environment Detection
         if (typeof __firebase_config !== 'undefined') {
-            // Preview Environment
             firebaseConfig = JSON.parse(__firebase_config);
             if (typeof __app_id !== 'undefined') appId = __app_id;
-            console.log("Running in Preview Mode (System Config)");
         } else {
-            // User Environment (GitHub/Local)
             firebaseConfig = myFirebaseConfig;
-            console.log("Running in User Mode (nakamura-farm Config)");
         }
 
         let db, auth, user;
-        let isCloudActive = false;
 
         // Display Project ID
         window.addEventListener('DOMContentLoaded', () => {
@@ -63,7 +58,6 @@
                 onAuthStateChanged(auth, (u) => {
                     if (u) {
                         user = u;
-                        console.log("Authenticated as:", user.uid);
                         initDataSync();
                     }
                 });
@@ -89,36 +83,24 @@
         function initDataSync() {
             if (!user || !db) return;
 
-            // Target Path
             const docRef = doc(db, 'artifacts', appId, 'public', 'data', COLLECTION_NAME, DATA_DOC_ID);
-            console.log("Listening to Document Path:", docRef.path);
 
             onSnapshot(docRef, (snapshot) => {
-                isCloudActive = true;
                 updateNetworkStatus("ONLINE (SYNC ACTIVE)", "text-emerald-400");
                 
-                // Indicate Data Reception
-                if(!snapshot.metadata.hasPendingWrites) {
-                    showToast("↓ Data Received from Cloud", "bg-blue-600");
-                }
-
                 if (snapshot.exists()) {
                     const data = snapshot.data();
                     if(data.appState) {
-                        console.log("Cloud data received.");
                         window.appState = JSON.parse(data.appState);
                         window.dispatchEvent(new Event('state-updated'));
                     }
                 } else {
-                    console.log("No cloud data found. Initializing...");
-                    saveToCloud(); // Create initial doc
+                    saveToCloud(); 
                 }
             }, (error) => {
                 console.error("Snapshot Error:", error);
                 if (error.code === 'permission-denied') {
-                    // Even if permission denied, we don't disable UI, just warn.
                     updateNetworkStatus("PERMISSION WARNING", "text-orange-400");
-                    console.warn("Permission denied. Check Firestore Rules. Attempting to run in Local Mode visually.");
                 } else {
                     updateNetworkStatus("CONNECTION RETRYING", "text-yellow-400");
                 }
@@ -126,7 +108,6 @@
         }
 
         window.saveToCloud = async function() {
-            // Always save local backup
             localStorage.setItem(LOCAL_KEY, JSON.stringify(window.appState));
 
             if (!user || !db) {
@@ -150,7 +131,6 @@
             }
         };
 
-        // UI Toast Helper
         function showToast(msg, bgClass) {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
@@ -178,6 +158,11 @@
         .chart-container { position: relative; height: 300px; width: 100%; }
         [contenteditable="true"]:focus { outline: none; border-bottom: 1px dashed #10b981; background-color: rgba(16, 185, 129, 0.1); color: #fff; }
         [contenteditable="true"]:hover { cursor: text; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #64748b; }
+        
+        /* Modal Tabs */
+        .modal-tab-active { background-color: #1e293b; color: #34d399; border-bottom: 2px solid #34d399; }
+        .modal-tab-inactive { background-color: transparent; color: #94a3b8; border-bottom: 2px solid transparent; }
+        .modal-tab-inactive:hover { color: #e2e8f0; background-color: #1e293b; }
     </style>
 </head>
 <body class="h-screen flex flex-col scan-effect relative">
@@ -189,7 +174,7 @@
                 <div class="w-10 h-10 bg-emerald-600 rounded flex items-center justify-center font-sci-fi font-bold text-xl shadow-[0_0_10px_rgba(16,185,129,0.5)]">N</div>
                 <div>
                     <div class="flex items-center group editable-trigger">
-                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V13</h1>
+                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V14</h1>
                         <span class="ml-2 text-xs text-slate-600">CLOUD SYNC</span>
                     </div>
                     <div class="flex items-center group editable-trigger">
@@ -284,6 +269,7 @@
         <!-- VIEW 2: ANNUAL STRATEGY -->
         <div id="view-annual" class="absolute inset-0 bg-slate-100 flex flex-col transition-transform duration-300 transform translate-x-full overflow-y-auto">
             <div class="max-w-7xl mx-auto w-full p-8 space-y-8">
+                <!-- Header -->
                 <div class="flex justify-between items-end border-b border-slate-300 pb-4">
                     <div>
                         <h2 class="text-3xl font-bold text-slate-800 flex items-center gap-3"><span class="bg-blue-600 text-white rounded p-1 text-2xl">📊</span> Annual Strategic Dashboard</h2>
@@ -294,10 +280,12 @@
                         <div class="bg-white p-3 rounded shadow-sm border border-slate-200"><div class="text-xs text-slate-400 uppercase">Total Actual Revenue</div><div class="text-xl font-bold text-green-700" id="annualTotalRevAct">¥0</div></div>
                     </div>
                 </div>
+                <!-- Charts -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">📈 Profit/Loss Trend</h3><div class="chart-container"><canvas id="annualTrendChart"></canvas></div></div>
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200"><h3 class="font-bold text-slate-700 mb-4">🍰 Revenue Composition</h3><div class="chart-container"><canvas id="annualSectorChart"></canvas></div></div>
                 </div>
+                <!-- Table -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
                     <h3 class="font-bold text-slate-700 mb-4">📅 Monthly Performance Table</h3>
                     <table class="w-full text-sm text-left text-slate-600">
@@ -317,16 +305,30 @@
     <!-- Modal 1: Detail/Item Editor -->
     <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-slate-800 w-full max-w-3xl rounded-xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]">
+            <!-- Header -->
             <div class="p-5 border-b border-slate-700 bg-slate-900 rounded-t-xl flex justify-between">
-                <div><div class="text-xs text-emerald-400 font-sci-fi mb-1">EDITING DETAILS</div><h3 class="text-2xl font-bold text-white" id="modalTitle">Account</h3></div>
-                <div class="text-right"><div class="text-xs text-slate-400 uppercase">Total (<span id="modalMonthDisp"></span>)</div><div class="text-3xl font-mono font-bold text-white" id="modalTotal">¥0</div></div>
+                <div>
+                    <div class="text-xs text-emerald-400 font-sci-fi mb-1">EDITING DETAILS</div>
+                    <h3 class="text-2xl font-bold text-white" id="modalTitle">Account</h3>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-slate-400 uppercase">Total (<span id="modalMonthDisp"></span>)</div>
+                    <div class="text-3xl font-mono font-bold text-white" id="modalTotal">¥0</div>
+                </div>
             </div>
-            <div class="px-6 py-4 bg-slate-800/50 border-b border-slate-700 flex items-center justify-between">
-                <div class="flex items-center space-x-3 w-full"><label class="text-sm text-slate-400 font-bold whitespace-nowrap">Monthly Budget:</label><div class="relative w-40"><span class="absolute left-3 top-2 text-slate-500">¥</span><input type="number" id="modalBudget" class="w-full bg-slate-900 border border-slate-600 text-slate-300 pl-6 pr-3 py-1.5 rounded text-right font-mono focus:border-emerald-500 outline-none" placeholder="0"></div></div>
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-700 bg-slate-900 px-2">
+                <button onclick="switchModalTab('actual')" id="modalTabActual" class="flex-1 py-3 text-sm font-bold transition modal-tab-active">📊 Actual (実績)</button>
+                <button onclick="switchModalTab('budget')" id="modalTabBudget" class="flex-1 py-3 text-sm font-bold transition modal-tab-inactive">🎯 Budget (予算)</button>
             </div>
+
+            <!-- List Area -->
             <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-900/30" id="modalItemsList"></div>
+
+            <!-- Footer -->
             <div class="p-5 border-t border-slate-700 bg-slate-900 rounded-b-xl flex justify-between">
-                <button onclick="addModalItem()" class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+ Add Entry</button>
+                <button onclick="addModalItem()" id="btnAddItem" class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+ Add Entry</button>
                 <div class="flex space-x-3"><button onclick="closeModal()" class="px-5 py-2 text-slate-400 hover:text-white transition">Close</button><button onclick="saveModalData()" class="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold shadow-lg">Confirm</button></div>
             </div>
         </div>
@@ -368,23 +370,23 @@
         let currentMonthIdx = 0; 
         let currentLevel = 'L1';
         let currentView = 'monthly';
+        let currentModalTab = 'actual'; // 'actual' or 'budget'
 
-        // Default Data
         const initialData = {
             L1: { 
                 name: '農園事業 (Farm)', icon: '🌱', colorClass: 'green',
-                revenue: [ { id: 'l1_r_main', name: '農園収入 (CSV計画分)', type: 'l1_r', items: [] } ],
-                expense: [ { id: 'l1_e_main', name: '農園支出 (CSV計画分)', type: 'l1_e', items: [] } ]
+                revenue: [ { id: 'l1_r_main', name: '農園収入 (CSV計画分)', type: 'l1_r', items: [], budgetItems: [] } ],
+                expense: [ { id: 'l1_e_main', name: '農園支出 (CSV計画分)', type: 'l1_e', items: [], budgetItems: [] } ]
             },
             L2: { 
                 name: '販売事業 (Sales)', icon: '🛒', colorClass: 'blue',
-                revenue: [ { id: 'l2_r_main', name: '販売収入 (CSV計画分)', type: 'l2_r', items: [] } ],
-                expense: [ { id: 'l2_e_main', name: '販売支出 (CSV計画分)', type: 'l2_e', items: [] } ]
+                revenue: [ { id: 'l2_r_main', name: '販売収入 (CSV計画分)', type: 'l2_r', items: [], budgetItems: [] } ],
+                expense: [ { id: 'l2_e_main', name: '販売支出 (CSV計画分)', type: 'l2_e', items: [], budgetItems: [] } ]
             },
             L3: { 
                 name: 'カフェバー (Cafe)', icon: '☕', colorClass: 'orange',
-                revenue: [ { id: 'l3_r_main', name: 'カフェ収入 (CSV計画分)', type: 'l3_r', items: [] } ],
-                expense: [ { id: 'l3_e_main', name: 'カフェ支出 (CSV計画分)', type: 'l3_e', items: [] } ]
+                revenue: [ { id: 'l3_r_main', name: 'カフェ収入 (CSV計画分)', type: 'l3_r', items: [], budgetItems: [] } ],
+                expense: [ { id: 'l3_e_main', name: 'カフェ支出 (CSV計画分)', type: 'l3_e', items: [], budgetItems: [] } ]
             }
         };
 
@@ -474,11 +476,27 @@
         }
         window.changeMonth = changeMonth;
 
-        function getMonthlyBudget(monthStr, planKey) {
+        function getMonthlyBudgetFromCSV(monthStr, planKey) {
             if (monthlyPlans[monthStr] && monthlyPlans[monthStr][planKey] !== undefined) {
                 return monthlyPlans[monthStr][planKey];
             }
             return 0;
+        }
+
+        // New Logic: Sum from budgetItems OR fallback to CSV
+        function getComputedBudget(category, monthStr) {
+            // Ensure budgetItems array exists
+            if (!category.budgetItems) category.budgetItems = [];
+            
+            const monthBudgetItems = category.budgetItems.filter(i => i.date.startsWith(monthStr));
+            
+            // If user has defined budget items for this month, use them
+            if (monthBudgetItems.length > 0) {
+                return monthBudgetItems.reduce((sum, i) => sum + i.val, 0);
+            }
+            
+            // Fallback to CSV plan if no custom items
+            return getMonthlyBudgetFromCSV(monthStr, category.type);
         }
 
         function renderMonthlyView() {
@@ -509,6 +527,7 @@
             let totalExpPlan = 0;
 
             const getMonthTotal = (items) => {
+                if(!items) return 0;
                 return items
                     .filter(i => i.date.startsWith(currentMonthStr))
                     .reduce((sum, i) => sum + i.val, 0);
@@ -516,14 +535,14 @@
 
             data.revenue.forEach(cat => {
                 const actual = getMonthTotal(cat.items);
-                const budget = getMonthlyBudget(currentMonthStr, cat.type); 
+                const budget = getComputedBudget(cat, currentMonthStr); 
                 totalRevPlan += budget;
                 revContainer.appendChild(createCard(cat, 'revenue', actual, budget));
             });
 
             data.expense.forEach(cat => {
                 const actual = getMonthTotal(cat.items);
-                const budget = getMonthlyBudget(currentMonthStr, cat.type);
+                const budget = getComputedBudget(cat, currentMonthStr);
                 totalExpPlan += budget;
                 expContainer.appendChild(createCard(cat, 'expense', actual, budget));
             });
@@ -560,7 +579,7 @@
                     <span>Plan: ¥${budgetValue.toLocaleString()}</span>
                     <span>${progress.toFixed(0)}%</span>
                 </div>
-                <div class="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-emerald-400 text-xs font-bold pointer-events-none">EDIT DETAILS ></div>
+                <div class="absolute right-2 bottom-2 opacity-0 group-hover:opacity-100 transition text-emerald-400 text-xs font-bold pointer-events-none">EDIT ></div>
             `;
             return div;
         }
@@ -570,8 +589,10 @@
                 let stats = { month, farmRev: 0, salesRev: 0, cafeRev: 0, totalRev: 0, totalExp: 0, totalRevPlan: 0 };
                 
                 const sumCatAct = (cats) => cats.reduce((acc, cat) => 
-                    acc + cat.items.filter(i => i.date.startsWith(month)).reduce((s, i) => s + i.val, 0), 0);
-                const sumCatPlan = (cats) => cats.reduce((acc, cat) => acc + getMonthlyBudget(month, cat.type), 0);
+                    acc + (cat.items ? cat.items.filter(i => i.date.startsWith(month)).reduce((s, i) => s + i.val, 0) : 0), 0);
+                
+                // Sum Computed Budgets
+                const sumCatPlan = (cats) => cats.reduce((acc, cat) => acc + getComputedBudget(cat, month), 0);
 
                 stats.farmRev = sumCatAct(window.appState.L1.revenue);
                 stats.salesRev = sumCatAct(window.appState.L2.revenue);
@@ -650,78 +671,162 @@
         function openModal(id, type) {
             currentEditingId = id;
             currentEditingType = type;
+            currentModalTab = 'actual'; // Default to actual
+            
             const category = window.appState[currentLevel][type].find(c => c.id === id);
             const currentMonthStr = fiscalMonths[currentMonthIdx];
 
             document.getElementById('modalTitle').textContent = category.name;
             document.getElementById('modalMonthDisp').textContent = currentMonthStr;
-            document.getElementById('modalBudget').value = getMonthlyBudget(currentMonthStr, category.type);
-
-            const monthItems = category.items.filter(i => i.date.startsWith(currentMonthStr));
-            renderModalItems(monthItems);
             
-            const total = monthItems.reduce((s, i) => s + i.val, 0);
-            document.getElementById('modalTotal').textContent = '¥' + total.toLocaleString();
-
+            updateModalUI();
             document.getElementById('detailModal').classList.remove('hidden');
         }
         window.openModal = openModal;
 
+        function switchModalTab(tab) {
+            currentModalTab = tab;
+            updateModalUI();
+        }
+        window.switchModalTab = switchModalTab;
+
+        function updateModalUI() {
+            const btnActual = document.getElementById('modalTabActual');
+            const btnBudget = document.getElementById('modalTabBudget');
+            const btnAdd = document.getElementById('btnAddItem');
+
+            if(currentModalTab === 'actual') {
+                btnActual.className = "flex-1 py-3 text-sm font-bold transition modal-tab-active";
+                btnBudget.className = "flex-1 py-3 text-sm font-bold transition modal-tab-inactive";
+                btnAdd.className = "text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20";
+                btnAdd.innerText = "+ Add Actual Entry";
+            } else {
+                btnActual.className = "flex-1 py-3 text-sm font-bold transition modal-tab-inactive";
+                btnBudget.className = "flex-1 py-3 text-sm font-bold transition modal-tab-active";
+                btnAdd.className = "text-blue-400 font-bold flex items-center px-4 py-2 rounded border border-blue-900/50 hover:bg-blue-900/20";
+                btnAdd.innerText = "+ Add Budget Entry";
+            }
+
+            renderModalItems();
+        }
+
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
         window.closeModal = closeModal;
 
-        function renderModalItems(items) {
+        function renderModalItems() {
             const list = document.getElementById('modalItemsList');
             list.innerHTML = '';
+            
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
-            const relevantIndices = category.items.map((item, idx) => ({ ...item, idx })).filter(item => item.date.startsWith(fiscalMonths[currentMonthIdx]));
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            
+            // Determine source array based on tab
+            let items = [];
+            if(currentModalTab === 'actual') {
+                items = category.items || [];
+            } else {
+                items = category.budgetItems || [];
+                // If Budget items are empty for this month, inject default CSV plan as a placeholder item (only visual if not saved)
+                const monthItems = items.filter(i => i.date.startsWith(currentMonthStr));
+                if(monthItems.length === 0) {
+                    const csvVal = getMonthlyBudgetFromCSV(currentMonthStr, category.type);
+                    if(csvVal > 0) {
+                        // We push a temporary item for rendering so user can see/edit it
+                        // Ideally we save this to state if user modifies it. 
+                        // Simplified: Display a special "Initial Plan" row if empty
+                        const row = document.createElement('div');
+                        row.className = "flex justify-between items-center bg-slate-800/50 p-3 rounded border border-slate-700 border-dashed mb-2";
+                        row.innerHTML = `
+                            <span class="text-slate-500 text-xs italic">CSV Initial Plan</span>
+                            <span class="text-slate-400 font-mono">¥${csvVal.toLocaleString()}</span>
+                            <button onclick="convertCsvToBudget(${csvVal})" class="text-xs bg-blue-600 text-white px-2 py-1 rounded">Edit as Item</button>
+                        `;
+                        list.appendChild(row);
+                    }
+                }
+            }
 
-            if (relevantIndices.length === 0) {
+            const relevantIndices = items.map((item, idx) => ({ ...item, idx })).filter(item => item.date.startsWith(currentMonthStr));
+
+            if (relevantIndices.length === 0 && list.children.length === 0) {
                 list.innerHTML = `<div class="text-center text-slate-500 py-4">No entries for this month.</div>`;
             }
 
             relevantIndices.forEach(itemObj => {
                 const row = document.createElement('div');
                 row.className = "flex space-x-2 items-center bg-slate-800 p-2 rounded border border-slate-700";
+                
+                const valColor = currentModalTab === 'actual' ? 'text-emerald-400' : 'text-blue-400';
+
                 row.innerHTML = `
                     <input type="date" value="${itemObj.date}" onchange="updateItem(${itemObj.idx}, 'date', this.value)" class="bg-slate-900 text-white text-xs px-2 py-1 rounded border border-slate-600 cursor-pointer">
                     <input type="text" value="${itemObj.name}" onchange="updateItem(${itemObj.idx}, 'name', this.value)" class="flex-1 bg-transparent text-white text-sm outline-none px-2" placeholder="Desc">
-                    <input type="number" value="${itemObj.val}" onchange="updateItem(${itemObj.idx}, 'val', this.value)" class="w-24 bg-transparent text-right text-emerald-400 font-mono font-bold outline-none" placeholder="0">
+                    <input type="number" value="${itemObj.val}" onchange="updateItem(${itemObj.idx}, 'val', this.value)" class="w-24 bg-transparent text-right ${valColor} font-mono font-bold outline-none" placeholder="0">
                     <button onclick="deleteItem(${itemObj.idx})" class="text-slate-500 hover:text-red-500 px-2">×</button>
                 `;
                 list.appendChild(row);
             });
+
+            // Update Total Header
+            const total = relevantIndices.reduce((s, i) => s + i.val, 0);
+            
+            // Note: For budget, if items are empty, we might want to show CSV val in header, 
+            // but consistency says show sum of items. 
+            // Let's show sum of items + CSV fallback if items empty
+            let displayTotal = total;
+            if (currentModalTab === 'budget' && relevantIndices.length === 0) {
+                 displayTotal = getMonthlyBudgetFromCSV(currentMonthStr, category.type);
+            }
+
+            document.getElementById('modalTotal').textContent = '¥' + displayTotal.toLocaleString();
+            document.getElementById('modalTotal').className = currentModalTab === 'actual' ? "text-3xl font-mono font-bold text-emerald-400" : "text-3xl font-mono font-bold text-blue-400";
         }
+
+        function convertCsvToBudget(val) {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            if(!category.budgetItems) category.budgetItems = [];
+            const defaultDate = fiscalMonths[currentMonthIdx] + '-01';
+            category.budgetItems.push({ name: '初期計画 (CSV)', val: val, date: defaultDate });
+            if(window.saveToCloud) window.saveToCloud();
+            renderModalItems();
+        }
+        window.convertCsvToBudget = convertCsvToBudget;
 
         function addModalItem() {
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
             const defaultDate = fiscalMonths[currentMonthIdx] + '-01';
-            category.items.push({ name: '', val: 0, date: defaultDate });
-            if(window.saveToCloud) window.saveToCloud();
             
-            // Re-render
-            const monthItems = category.items.filter(i => i.date.startsWith(fiscalMonths[currentMonthIdx]));
-            openModal(currentEditingId, currentEditingType); 
+            if(currentModalTab === 'actual') {
+                if(!category.items) category.items = [];
+                category.items.push({ name: '', val: 0, date: defaultDate });
+            } else {
+                if(!category.budgetItems) category.budgetItems = [];
+                category.budgetItems.push({ name: '', val: 0, date: defaultDate });
+            }
+            
+            if(window.saveToCloud) window.saveToCloud();
+            renderModalItems();
         }
         window.addModalItem = addModalItem;
 
         function updateItem(realIndex, field, value) {
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
-            if (field === 'val') value = parseInt(value) || 0;
-            category.items[realIndex][field] = value;
-            if(window.saveToCloud) window.saveToCloud();
+            const targetArray = currentModalTab === 'actual' ? category.items : category.budgetItems;
             
-            const monthItems = category.items.filter(i => i.date.startsWith(fiscalMonths[currentMonthIdx]));
-            const total = monthItems.reduce((s, i) => s + i.val, 0);
-            document.getElementById('modalTotal').textContent = '¥' + total.toLocaleString();
+            if (field === 'val') value = parseInt(value) || 0;
+            targetArray[realIndex][field] = value;
+            
+            if(window.saveToCloud) window.saveToCloud();
+            renderModalItems(); // Re-calc total
         }
         window.updateItem = updateItem;
 
         function deleteItem(realIndex) {
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
-            category.items.splice(realIndex, 1);
+            const targetArray = currentModalTab === 'actual' ? category.items : category.budgetItems;
+            targetArray.splice(realIndex, 1);
             if(window.saveToCloud) window.saveToCloud();
-            openModal(currentEditingId, currentEditingType);
+            renderModalItems();
         }
         window.deleteItem = deleteItem;
 
@@ -734,12 +839,23 @@
         window.saveModalData = saveModalData;
 
         function updateGlobalHeader() {
-            const totalRevPlan = fiscalMonths.reduce((sum, m) => {
-                return sum + getMonthlyBudget(m, 'l1_r') + getMonthlyBudget(m, 'l2_r') + getMonthlyBudget(m, 'l3_r');
-            }, 0);
-             const totalExpPlan = fiscalMonths.reduce((sum, m) => {
-                return sum + getMonthlyBudget(m, 'l1_e') + getMonthlyBudget(m, 'l2_e') + getMonthlyBudget(m, 'l3_e');
-            }, 0);
+            // Simplified total calc for header
+            // Ideally should sum all categories' computed budgets
+            // For now just re-using the monthlyPlans logic for speed, or strict recalc
+            // Let's do strict recalc based on computed budgets
+            let totalRevPlan = 0;
+            let totalExpPlan = 0;
+            
+            ['L1','L2','L3'].forEach(lvl => {
+                const d = window.appState[lvl];
+                d.revenue.forEach(c => {
+                    fiscalMonths.forEach(m => totalRevPlan += getComputedBudget(c, m));
+                });
+                d.expense.forEach(c => {
+                    fiscalMonths.forEach(m => totalExpPlan += getComputedBudget(c, m));
+                });
+            });
+
             const projProfit = totalRevPlan - totalExpPlan;
             const el = document.getElementById('globalProfit');
             el.textContent = '¥' + projProfit.toLocaleString();
@@ -762,7 +878,7 @@
             const name = document.getElementById('newCategoryName').value;
             if (name) {
                 const newId = Date.now();
-                window.appState[currentLevel][type].push({ id: newId, name: name, type: `custom_${newId}`, items: []});
+                window.appState[currentLevel][type].push({ id: newId, name: name, type: `custom_${newId}`, items: [], budgetItems: []});
                 if(window.saveToCloud) window.saveToCloud();
                 renderMonthlyView();
                 closeCategoryModal();

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Command V19 - Cash Flow Forecast</title>
+    <title>Strategic Command V20 - Hybrid Forecast</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -91,7 +91,7 @@
                     if(data.appState) {
                         window.appState = JSON.parse(data.appState);
                         
-                        // Force Sector Names
+                        // Fix Sector Names
                         window.appState.L1.name = "農園事業 (Farm)";
                         window.appState.L1.icon = "🌱";
                         window.appState.L1.colorClass = "green";
@@ -103,7 +103,7 @@
                         window.appState.L3.colorClass = "orange";
 
                         if(!window.appState.fixedMonths) window.appState.fixedMonths = {};
-                        // Initial Cash Balance (Default if not set)
+                        // Fix 0 value bug: Check strict undefined
                         if(window.appState.initialCash === undefined) window.appState.initialCash = 1000000; 
 
                         window.dispatchEvent(new Event('state-updated'));
@@ -187,7 +187,7 @@
                 <div class="w-10 h-10 bg-emerald-600 rounded flex items-center justify-center font-sci-fi font-bold text-xl shadow-[0_0_10px_rgba(16,185,129,0.5)]">N</div>
                 <div>
                     <div class="flex items-center group editable-trigger">
-                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V19</h1>
+                        <h1 contenteditable="true" class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">STRATEGIC COMMAND V20</h1>
                         <span class="ml-2 text-xs text-slate-600">CLOUD SYNC</span>
                     </div>
                     <div class="flex items-center group editable-trigger">
@@ -244,7 +244,7 @@
 
                 <!-- Workspace -->
                 <main class="flex-1 bg-slate-900 relative overflow-y-auto p-6">
-                    <!-- Fix Header -->
+                    <!-- Fix / Unfix Header Bar -->
                     <div class="flex justify-between items-center mb-4 bg-slate-800 p-3 rounded-lg border border-slate-700 shadow-md">
                         <div class="flex items-center space-x-4">
                             <span class="text-slate-400 text-sm font-bold">STATUS:</span>
@@ -258,6 +258,7 @@
                     <!-- Result Board -->
                     <div id="resultBoard" class="hidden mb-8 animate-pop">
                         <div class="grid grid-cols-3 gap-6">
+                            <!-- Revenue Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL REVENUE (売上)</div>
                                 <div class="flex justify-between items-end mb-2">
@@ -267,6 +268,8 @@
                                 <div id="badgeRev" class="absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-lose">LOSE</div>
                                 <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden"><div id="barRev" class="bg-emerald-500 h-full w-0"></div></div>
                             </div>
+
+                            <!-- Expense Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL EXPENSE (支出)</div>
                                 <div class="flex justify-between items-end mb-2">
@@ -276,6 +279,8 @@
                                 <div id="badgeExp" class="absolute top-4 right-4 px-3 py-1 rounded text-xs font-black transform rotate-12 shadow-lg badge-win">WIN</div>
                                 <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden"><div id="barExp" class="bg-red-500 h-full w-0"></div></div>
                             </div>
+
+                            <!-- Profit Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">OPERATING PROFIT (利益)</div>
                                 <div class="flex justify-between items-end mb-2">
@@ -345,22 +350,22 @@
                     <div class="flex items-center space-x-4">
                         <div class="bg-white p-3 rounded shadow-sm border border-slate-200">
                             <div class="text-xs text-slate-400 uppercase">期首残高 (設定可)</div>
-                            <input type="number" id="initialCashInput" class="text-xl font-bold text-slate-800 w-32 border-b border-slate-300 focus:border-blue-500 outline-none" value="1000000" onchange="updateInitialCash(this.value)">
+                            <input type="number" id="initialCashInput" class="text-xl font-bold text-slate-800 w-32 border-b border-slate-300 focus:border-blue-500 outline-none" placeholder="0" onchange="updateInitialCash(this.value)">
                         </div>
                     </div>
                 </div>
 
-                <!-- CASH FLOW CHART (NEW) -->
+                <!-- CASH FLOW CHART -->
                 <div class="bg-white p-6 rounded-xl shadow-lg border-2 border-slate-200 relative overflow-hidden">
                     <div class="absolute top-0 left-0 w-2 h-full bg-yellow-400"></div>
                     <h3 class="font-bold text-slate-700 mb-4 flex items-center">
                         <span class="text-2xl mr-2">💰</span> 
-                        資金繰り予測 (Cash Flow Projection)
+                        資金繰り予測 (Cash Flow: 実績+予定 ハイブリッド)
                     </h3>
                     <div class="chart-container" style="height: 350px;">
                         <canvas id="cashFlowChart"></canvas>
                     </div>
-                    <div class="mt-2 text-xs text-slate-500 text-right">*赤色のゾーンは資金不足 (ショート) の危険領域です</div>
+                    <div class="mt-2 text-xs text-slate-500 text-right">*確定(Fix)月は実績、未確定月は予算ベースで計算されます</div>
                 </div>
 
                 <!-- Other Charts -->
@@ -374,7 +379,7 @@
         </div>
     </div>
 
-    <!-- Modals (Detail / Category / Toast) ... (Same as V18) -->
+    <!-- Modals (Detail / Category / Toast) ... (Same as previous) -->
     <!-- Modal 1: Detail -->
     <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-slate-800 w-full max-w-3xl rounded-xl shadow-2xl border border-slate-600 flex flex-col max-h-[90vh]">
@@ -457,7 +462,7 @@
         let currentEditingType = null;
         let trendChart = null;
         let sectorChart = null;
-        let cashFlowChart = null; // New chart
+        let cashFlowChart = null; 
 
         function init() {
             renderMonthlyView();
@@ -466,7 +471,9 @@
 
         window.addEventListener('state-updated', () => {
             if(document.getElementById('initialCashInput')) {
-                document.getElementById('initialCashInput').value = window.appState.initialCash || 1000000;
+                // FIXED: Handle 0 properly so it doesn't show blank or default
+                const val = (window.appState.initialCash !== undefined) ? window.appState.initialCash : 1000000;
+                document.getElementById('initialCashInput').value = val;
             }
             renderMonthlyView();
             updateGlobalHeader();
@@ -475,7 +482,6 @@
 
         window.addEventListener('app-ready', () => { init(); });
 
-        // --- Editing Logic ---
         function updateSectorName(el) {
             const newName = el.innerText.trim();
             if(newName) {
@@ -498,7 +504,11 @@
         window.updateCategoryName = updateCategoryName;
 
         function updateInitialCash(val) {
-            window.appState.initialCash = parseInt(val) || 0;
+            // FIXED: Allow 0
+            if (val === '') return; 
+            window.appState.initialCash = parseInt(val);
+            if(isNaN(window.appState.initialCash)) window.appState.initialCash = 0;
+            
             if(window.saveToCloud) window.saveToCloud();
             renderAnnualView();
         }
@@ -620,13 +630,11 @@
                     : `group w-16 h-16 rounded-xl bg-slate-800 text-slate-500 flex flex-col items-center justify-center border-2 border-transparent hover:bg-slate-700 transition`;
             });
 
-            // FIXED: Ensure SECTOR title updates dynamically
             const sectorTitleEl = document.getElementById('sectorTitle');
             const colorClass = window.appState[currentLevel].colorClass;
             let colorTailwind = "text-emerald-400";
             if(colorClass === 'blue') colorTailwind = "text-blue-400";
             if(colorClass === 'orange') colorTailwind = "text-orange-400";
-            
             sectorTitleEl.innerText = `SECTOR ${currentLevel}`;
             sectorTitleEl.className = `font-sci-fi block text-xs tracking-widest ${colorTailwind}`;
 
@@ -763,30 +771,49 @@
         }
 
         function renderAnnualView() {
-            // Recalc annual stats
-            let currentBalance = window.appState.initialCash || 1000000;
+            let currentBalance = (window.appState.initialCash !== undefined) ? window.appState.initialCash : 1000000;
             const balanceHistory = [];
             const labels = [];
 
             const monthlyStats = fiscalMonths.map(month => {
-                // ... same logic for summary stats ...
                 let stats = { month, farmRev: 0, salesRev: 0, cafeRev: 0, totalRev: 0, totalExp: 0, totalRevPlan: 0 };
-                // Simplified Sum
-                const sumCatAct = (cats) => cats.reduce((acc, cat) => 
-                    acc + (cat.items ? cat.items.filter(i => i.date.startsWith(month)).reduce((s, i) => s + i.val, 0) : 0), 0);
                 
-                stats.farmRev = sumCatAct(window.appState.L1.revenue);
-                stats.salesRev = sumCatAct(window.appState.L2.revenue);
-                stats.cafeRev = sumCatAct(window.appState.L3.revenue);
-                const farmExp = sumCatAct(window.appState.L1.expense);
-                const salesExp = sumCatAct(window.appState.L2.expense);
-                const cafeExp = sumCatAct(window.appState.L3.expense);
+                // HYBRID LOGIC FOR CHART CALCULATION
+                // ----------------------------------------------------
+                const isFixed = window.appState.fixedMonths && window.appState.fixedMonths[month];
+                let monthRevForFlow = 0;
+                let monthExpForFlow = 0;
 
-                stats.totalRev = stats.farmRev + stats.salesRev + stats.cafeRev;
-                stats.totalExp = farmExp + salesExp + cafeExp;
-                
-                // Cash Flow Logic
-                const netMove = stats.totalRev - stats.totalExp;
+                ['L1','L2','L3'].forEach(lvl => {
+                    const d = window.appState[lvl];
+                    
+                    // 1. Calculate Actuals (Used if Fixed)
+                    const revAct = d.revenue.reduce((acc, c) => acc + (c.items||[]).filter(i => i.date.startsWith(month)).reduce((s,i)=>s+i.val,0), 0);
+                    const expAct = d.expense.reduce((acc, c) => acc + (c.items||[]).filter(i => i.date.startsWith(month)).reduce((s,i)=>s+i.val,0), 0);
+                    
+                    // 2. Calculate Plans (Used if Not Fixed)
+                    const revPlan = d.revenue.reduce((acc, c) => acc + getComputedBudget(c, month), 0);
+                    const expPlan = d.expense.reduce((acc, c) => acc + getComputedBudget(c, month), 0);
+
+                    // 3. Stats for Table/Chart (Always show Actual vs Plan separately in table)
+                    if (lvl === 'L1') stats.farmRev = revAct;
+                    if (lvl === 'L2') stats.salesRev = revAct;
+                    if (lvl === 'L3') stats.cafeRev = revAct;
+                    stats.totalRev += revAct;
+                    stats.totalExp += expAct;
+                    stats.totalRevPlan += revPlan; // For trend chart comparison
+
+                    // 4. Flow Calculation
+                    if (isFixed) {
+                        monthRevForFlow += revAct;
+                        monthExpForFlow += expAct;
+                    } else {
+                        monthRevForFlow += revPlan;
+                        monthExpForFlow += expPlan;
+                    }
+                });
+
+                const netMove = monthRevForFlow - monthExpForFlow;
                 currentBalance += netMove;
                 balanceHistory.push(currentBalance);
                 labels.push(month);
@@ -795,18 +822,35 @@
             });
 
             updateCashFlowChart(labels, balanceHistory);
-            updateAnnualCharts(monthlyStats); // keep existing charts too
-            // ... (table update) ...
+            updateAnnualCharts(monthlyStats);
+            
+            // ... Table Update Code ...
+            const tbody = document.getElementById('annualTableBody');
+            tbody.innerHTML = '';
+            monthlyStats.forEach(m => {
+                const p = m.totalRev - m.totalExp;
+                const tr = document.createElement('tr');
+                tr.className = "bg-white border-b hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="px-6 py-3 font-medium text-slate-900">${m.month}</td>
+                    <td class="px-6 py-3 text-right">${m.farmRev > 0 ? m.farmRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right">${m.salesRev > 0 ? m.salesRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right">${m.cafeRev > 0 ? m.cafeRev.toLocaleString() : '-'}</td>
+                    <td class="px-6 py-3 text-right font-bold border-l bg-green-50">${m.totalRev.toLocaleString()}</td>
+                    <td class="px-6 py-3 text-right font-bold border-l bg-red-50 text-red-600">${m.totalExp.toLocaleString()}</td>
+                    <td class="px-6 py-3 text-right font-black border-l ${p>=0 ? 'text-green-600':'text-red-600'}">${p.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         function updateCashFlowChart(labels, data) {
             const ctx = document.getElementById('cashFlowChart').getContext('2d');
             if(cashFlowChart) cashFlowChart.destroy();
 
-            // Create gradient for danger zone (negative values)
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(34, 197, 94, 0.2)'); // Greenish top
-            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.5)'); // Red bottom
+            gradient.addColorStop(0, 'rgba(34, 197, 94, 0.2)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.5)');
 
             cashFlowChart = new Chart(ctx, {
                 type: 'line',

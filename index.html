@@ -156,6 +156,7 @@
                 setTimeout(() => { toast.style.opacity = '0'; }, 3000);
             }
         }
+        window.showToast = showToast;
 
     </script>
 
@@ -887,7 +888,12 @@
             } catch (e) {
                 console.error(e);
                 document.getElementById('aiLoading').classList.add('hidden');
-                document.getElementById('aiComment').innerText = "COMMUNICATION ERROR: " + e.message;
+                let errMsg = "COMMUNICATION ERROR: " + e.message;
+                // Check for 503 or overload related errors
+                if (e.message.includes('503') || e.message.toLowerCase().includes('overloaded')) {
+                    errMsg = "⚠️ ACCESS BUSY: AI参謀が混雑しています。少し時間を置いて再試行してください。";
+                }
+                document.getElementById('aiComment').innerHTML = `<span class="text-xs text-orange-400 font-mono">${errMsg}</span>`;
             }
         }
 

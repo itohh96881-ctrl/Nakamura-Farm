@@ -834,7 +834,6 @@
         }
         updateFixButtonsState(isCurrentlyFixed);
         }
-        window.toggleFixMonth = toggleFixMonth;
 
         function updateFixButtonsState(isFixed) {
             const currentMonthStr = fiscalMonths[currentMonthIdx];
@@ -969,7 +968,7 @@
 
             const prompt = `
             あなたは近未来の農業経営シミュレーションゲームの戦略AI参謀です。
-            指揮官（プレイヤー）に対して、今月の収支結果に基づく簡単な報告とアドバイスをしてください。
+            指揮官（プレイヤー）に対して、今月の収支結果に基づく報告とアドバイスをしてください。
 
             Data for ${monthStr}:
             Total Revenue: ${totalRev}
@@ -982,9 +981,21 @@
             
             ${reviewContext}
 
-            Tone: Sci-Fi, Professional, slightly encouraging but strict on numbers.
-            Length: Around 150-250 Japanese characters.
-            Output only the message.
+            [Instructions]
+            1. Based on the financial data and user reflections, provide a brief status report.
+            2. Propose exactly 3 specific, actionable steps the user should prioritize next month to improve profitability.
+            3. Format the output STRICTLY as follows:
+
+            【総評】
+            (Report text...)
+
+            【次月の優先アクションTOP3】
+            1. (Action 1)
+            2. (Action 2)
+            3. (Action 3)
+
+            Tone: Sci-Fi, Professional, encouraging.
+            Language: Japanese.
             `;
 
             try {

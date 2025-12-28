@@ -280,7 +280,7 @@
                     <div class="flex items-center group editable-trigger">
                         <h1 contenteditable="true"
                             class="font-sci-fi font-bold text-lg tracking-wider text-emerald-100 leading-tight">
-                            STRATEGIC COMMAND V20</h1>
+                            STRATEGIC COMMAND V21</h1>
                         <span class="ml-2 text-xs text-slate-600">CLOUD SYNC</span>
                     </div>
                     <div class="flex items-center group editable-trigger">
@@ -831,8 +831,7 @@
                     origin: { y: 0.6 }
                 });
             }
-        }
-        updateFixButtonsState(isCurrentlyFixed);
+            updateFixButtonsState(!isCurrentlyFixed);
         }
 
         function updateFixButtonsState(isFixed) {

@@ -374,7 +374,7 @@
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
                                     <span>TOTAL REVENUE (売上)</span>
                                     <button id="btnReviewRev" onclick="reviewMainMetric('revenue')"
-                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        class="text-slate-500 hover:text-emerald-400 transition z-20 relative"
                                         title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
@@ -395,7 +395,7 @@
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
                                     <span>TOTAL EXPENSE (支出)</span>
                                     <button id="btnReviewExp" onclick="reviewMainMetric('expense')"
-                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        class="text-slate-500 hover:text-emerald-400 transition z-20 relative"
                                         title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
@@ -416,7 +416,7 @@
                                 <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
                                     <span>OPERATING PROFIT (利益)</span>
                                     <button id="btnReviewProfit" onclick="reviewMainMetric('profit')"
-                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        class="text-slate-500 hover:text-emerald-400 transition z-20 relative"
                                         title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
@@ -846,11 +846,16 @@
                 // Check stored reviews to colorize
                 const saved = (window.appState.monthlyMetaReviews && window.appState.monthlyMetaReviews[currentMonthStr]) || {};
 
-                revBtn.className = saved.revenue ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
-                expBtn.className = saved.expense ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
-                profBtn.className = saved.profit ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
+                revBtn.classList.remove('text-slate-500', 'text-emerald-400', 'hover:text-emerald-400', 'hover:text-white', 'hidden');
+                expBtn.classList.remove('text-slate-500', 'text-emerald-400', 'hover:text-emerald-400', 'hover:text-white', 'hidden');
+                profBtn.classList.remove('text-slate-500', 'text-emerald-400', 'hover:text-emerald-400', 'hover:text-white', 'hidden');
 
-                els.forEach(el => el.classList.remove('hidden'));
+                if (saved.revenue) { revBtn.classList.add('text-emerald-400', 'hover:text-white'); } else { revBtn.classList.add('text-slate-500', 'hover:text-emerald-400'); }
+                if (saved.expense) { expBtn.classList.add('text-emerald-400', 'hover:text-white'); } else { expBtn.classList.add('text-slate-500', 'hover:text-emerald-400'); }
+                if (saved.profit) { profBtn.classList.add('text-emerald-400', 'hover:text-white'); } else { profBtn.classList.add('text-slate-500', 'hover:text-emerald-400'); }
+
+                // Add base transition classes if missing (just to be safe)
+                els.forEach(el => el.classList.add('transition', 'z-20', 'relative'));
             } else {
                 els.forEach(el => el.classList.add('hidden'));
             }

@@ -1045,16 +1045,27 @@
         }
         window.forceReAnalyze = forceReAnalyze;
 
+        let currentTypewriterTimeout = null;
+
         function typewriterEffect(text) {
             const el = document.getElementById('aiComment');
+            // Cancel previous typing if any
+            if (currentTypewriterTimeout) {
+                clearTimeout(currentTypewriterTimeout);
+                currentTypewriterTimeout = null;
+            }
+
             el.innerText = "";
             let i = 0;
             const speed = 20;
+
             function type() {
                 if (i < text.length) {
                     el.innerText += text.charAt(i);
                     i++;
-                    setTimeout(type, speed);
+                    currentTypewriterTimeout = setTimeout(type, speed);
+                } else {
+                    currentTypewriterTimeout = null;
                 }
             }
             type();

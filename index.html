@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strategic Command V20 - Hybrid Forecast</title>
+    <title>Strategic Command V21 - Hybrid Forecast</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
@@ -575,6 +575,20 @@
                     class="flex-1 py-3 text-sm font-bold transition modal-tab-inactive">🎯 Budget (予算)</button>
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-900/30" id="modalItemsList"></div>
+
+            <!-- Category Review Section (Visible only in Fix Mode) -->
+            <div id="modalReviewSection" class="hidden px-5 py-3 bg-slate-800/80 border-t border-slate-700">
+                <label class="text-xs text-emerald-400 font-bold mb-1 block">💬 CATEGORY REVIEW (科目振り返り)</label>
+                <textarea id="modalCategoryReview" rows="2"
+                    class="w-full bg-slate-900 text-slate-300 text-sm p-2 rounded border border-slate-600 focus:border-emerald-500 outline-none placeholder-slate-600"
+                    placeholder="この科目についての振り返りやメモを入力..."></textarea>
+                <div class="text-right mt-1">
+                    <button onclick="saveCategoryReview()"
+                        class="text-xs bg-emerald-900 text-emerald-400 px-3 py-1 rounded border border-emerald-700 hover:bg-emerald-800">Save
+                        Review</button>
+                </div>
+            </div>
+
             <div class="p-5 border-t border-slate-700 bg-slate-900 rounded-b-xl flex justify-between">
                 <button onclick="addModalItem()" id="btnAddItem"
                     class="text-emerald-400 font-bold flex items-center px-4 py-2 rounded border border-emerald-900/50 hover:bg-emerald-900/20">+
@@ -846,9 +860,11 @@
                     cats.forEach(c => {
                         const mItems = (c.items || []).filter(i => i.date.startsWith(monthStr));
                         sum += mItems.reduce((s, i) => s + i.val, 0);
-                        mItems.forEach(i => {
-                            if (i.review) userReviews.push(`- Item "${i.name}": user reviewed "${i.review}"`);
-                        });
+
+                        // Collect Category Reviews
+                        if (c.reviews && c.reviews[monthStr]) {
+                            userReviews.push(`- Category "${c.name}": ${c.reviews[monthStr]}`);
+                        }
                     });
                     return sum;
                 };
@@ -1344,12 +1360,38 @@
             if (currentModalIsFixed) {
                 btnAdd.style.display = 'none';
                 document.querySelector('button[onclick="saveModalData()"]').style.display = 'none';
+                // Show Review Section
+                document.getElementById('modalReviewSection').classList.remove('hidden');
+
+                const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+                const currentMonthStr = fiscalMonths[currentMonthIdx];
+                const reviewText = (category.reviews && category.reviews[currentMonthStr]) ? category.reviews[currentMonthStr] : "";
+                document.getElementById('modalCategoryReview').value = reviewText;
+
             } else {
                 btnAdd.style.display = 'flex'; // Restore flex
                 document.querySelector('button[onclick="saveModalData()"]').style.display = 'block';
+                document.getElementById('modalReviewSection').classList.add('hidden');
             }
 
             renderModalItems();
+        }
+
+        function saveCategoryReview() {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            const val = document.getElementById('modalCategoryReview').value;
+
+            if (!category.reviews) category.reviews = {};
+            category.reviews[currentMonthStr] = val;
+
+            if (window.saveToCloud) window.saveToCloud();
+
+            // Visual Feedback
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "Saved!";
+            setTimeout(() => btn.innerText = originalText, 1000);
         }
 
         function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
@@ -1398,9 +1440,7 @@
                 const disabledAttr = currentModalIsFixed ? 'disabled' : '';
                 let actionBtn = '';
                 if (currentModalIsFixed) {
-                    const hasReview = !!itemObj.review;
-                    const btnColor = hasReview ? 'text-emerald-400' : 'text-slate-600';
-                    actionBtn = `<button onclick="reviewItem(${itemObj.idx})" class="${btnColor} hover:text-white px-2" title="Review">💬</button>`;
+                    // No item-level review button anymore
                 } else {
                     actionBtn = `<button onclick="deleteItem(${itemObj.idx})" class="text-slate-500 hover:text-red-500 px-2">×</button>`;
                 }
@@ -1425,21 +1465,8 @@
             document.getElementById('modalTotal').className = currentModalTab === 'actual' ? "text-3xl font-mono font-bold text-emerald-400" : "text-3xl font-mono font-bold text-blue-400";
         }
 
-        function reviewItem(idx) {
-            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
-            if (!category || !category.items || !category.items[idx]) return;
+        // function reviewItem(idx) removed
 
-            const item = category.items[idx];
-            const currentReview = item.review || "";
-            const newReview = prompt("この項目について振り返りコメントを入力してください\\n(AI診断の参考にされます):", currentReview);
-
-            if (newReview !== null) {
-                item.review = newReview;
-                if (window.saveToCloud) window.saveToCloud();
-                renderModalItems();
-            }
-        }
-        window.reviewItem = reviewItem;
 
         function convertCsvToBudget(val) {
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);

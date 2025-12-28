@@ -426,11 +426,16 @@
                         <h3 class="text-emerald-400 font-bold font-sci-fi tracking-widest flex items-center mb-2">
                             <span class="mr-2 text-xl">🤖</span> STRATEGIC AI DIAGNOSIS
                         </h3>
-                        <div id="aiLoading" class="hidden text-xs font-mono text-emerald-500/80 animate-pulse">
+                        <div id="aiLoading" class="hidden text-xs font-mono text-emerald-500/80 animate-pulse mb-2">
                             ANALYZING BATTLEFIELD DATA... [//////// ]
                         </div>
                         <div id="aiComment"
-                            class="text-sm text-slate-300 font-sans leading-relaxed tracking-wide typing-effect"></div>
+                            class="text-sm text-slate-300 font-sans leading-relaxed tracking-wide typing-effect min-h-[40px]">
+                        </div>
+                        <button id="btnAiRefresh" onclick="forceReAnalyze()"
+                            class="absolute top-4 right-4 text-xs bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border border-emerald-700 px-2 py-1 rounded hidden transition">
+                            🔄 RE-ANALYZE (With Reviews)
+                        </button>
                     </div>
 
                     <!-- Sector Header -->
@@ -803,18 +808,21 @@
         }
         window.toggleFixMonth = toggleFixMonth;
 
-        async function analyzeWithGemini(monthStr) {
+        async function analyzeWithGemini(monthStr, force = false) {
             const apiKey = localStorage.getItem('nakamura_gemini_key');
 
             // UI Setup
             document.getElementById('aiAnalysisSection').classList.remove('hidden');
             document.getElementById('aiLoading').classList.remove('hidden');
             document.getElementById('aiComment').innerText = '';
+            const btnRefresh = document.getElementById('btnAiRefresh');
+            if (btnRefresh) btnRefresh.classList.add('hidden');
 
             // If already has comment, show it (don't re-generate to save cost/time)
-            if (window.appState.monthlyComments && window.appState.monthlyComments[monthStr]) {
+            if (!force && window.appState.monthlyComments && window.appState.monthlyComments[monthStr]) {
                 document.getElementById('aiLoading').classList.add('hidden');
                 typewriterEffect(window.appState.monthlyComments[monthStr]);
+                if (btnRefresh) btnRefresh.classList.remove('hidden');
                 return;
             }
 
@@ -827,12 +835,26 @@
             // Gather Data
             let totalRev = 0, totalExp = 0, totalRevPlan = 0;
             const sectorDetails = [];
+            let userReviews = [];
 
             ['L1', 'L2', 'L3'].forEach(lvl => {
                 const d = window.appState[lvl];
                 let sRev = 0, sExp = 0;
-                d.revenue.forEach(c => sRev += (c.items || []).filter(i => i.date.startsWith(monthStr)).reduce((s, i) => s + i.val, 0));
-                d.expense.forEach(c => sExp += (c.items || []).filter(i => i.date.startsWith(monthStr)).reduce((s, i) => s + i.val, 0));
+
+                const scanItems = (cats) => {
+                    let sum = 0;
+                    cats.forEach(c => {
+                        const mItems = (c.items || []).filter(i => i.date.startsWith(monthStr));
+                        sum += mItems.reduce((s, i) => s + i.val, 0);
+                        mItems.forEach(i => {
+                            if (i.review) userReviews.push(`- Item "${i.name}": user reviewed "${i.review}"`);
+                        });
+                    });
+                    return sum;
+                };
+
+                sRev = scanItems(d.revenue);
+                sExp = scanItems(d.expense);
 
                 totalRev += sRev;
                 totalExp += sExp;
@@ -846,6 +868,18 @@
             });
 
             const profit = totalRev - totalExp;
+
+            let reviewContext = "";
+            if (userReviews.length > 0) {
+                reviewContext = `
+                [User's Self-Reflections for specific items]
+                ${userReviews.join('\n')}
+                
+                Please take these reflections into account. If the user mentions bad conditions, be sympathetic. If they mention waste, be strict.
+                Include specific advice based on these reviews.
+                `;
+            }
+
             const prompt = `
             あなたは近未来の農業経営シミュレーションゲームの戦略AI参謀です。
             指揮官（プレイヤー）に対して、今月の収支結果に基づく簡単な報告とアドバイスをしてください。
@@ -858,9 +892,11 @@
 
             Sectors:
             ${sectorDetails.join('\n')}
+            
+            ${reviewContext}
 
             Tone: Sci-Fi, Professional, slightly encouraging but strict on numbers.
-            Length: Around 150-200 Japanese characters.
+            Length: Around 150-250 Japanese characters.
             Output only the message.
             `;
 
@@ -883,6 +919,7 @@
 
                 // Show
                 document.getElementById('aiLoading').classList.add('hidden');
+                if (btnRefresh) btnRefresh.classList.remove('hidden');
                 typewriterEffect(comment);
 
             } catch (e) {
@@ -896,6 +933,12 @@
                 document.getElementById('aiComment').innerHTML = `<span class="text-xs text-orange-400 font-mono">${errMsg}</span>`;
             }
         }
+
+        function forceReAnalyze() {
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            analyzeWithGemini(currentMonthStr, true);
+        }
+        window.forceReAnalyze = forceReAnalyze;
 
         function typewriterEffect(text) {
             const el = document.getElementById('aiComment');
@@ -1353,13 +1396,20 @@
                 const valColor = currentModalTab === 'actual' ? 'text-emerald-400' : 'text-blue-400';
 
                 const disabledAttr = currentModalIsFixed ? 'disabled' : '';
-                const deleteBtn = currentModalIsFixed ? '' : `<button onclick="deleteItem(${itemObj.idx})" class="text-slate-500 hover:text-red-500 px-2">×</button>`;
+                let actionBtn = '';
+                if (currentModalIsFixed) {
+                    const hasReview = !!itemObj.review;
+                    const btnColor = hasReview ? 'text-emerald-400' : 'text-slate-600';
+                    actionBtn = `<button onclick="reviewItem(${itemObj.idx})" class="${btnColor} hover:text-white px-2" title="Review">💬</button>`;
+                } else {
+                    actionBtn = `<button onclick="deleteItem(${itemObj.idx})" class="text-slate-500 hover:text-red-500 px-2">×</button>`;
+                }
 
                 row.innerHTML = `
                     <input type="date" value="${itemObj.date}" onchange="updateItem(${itemObj.idx}, 'date', this.value)" class="bg-slate-900 text-white text-xs px-2 py-1 rounded border border-slate-600 cursor-pointer" ${disabledAttr}>
                     <input type="text" value="${itemObj.name}" onchange="updateItem(${itemObj.idx}, 'name', this.value)" class="flex-1 bg-transparent text-white text-sm outline-none px-2" placeholder="Desc" ${disabledAttr}>
                     <input type="number" value="${itemObj.val}" onchange="updateItem(${itemObj.idx}, 'val', this.value)" class="w-24 bg-transparent text-right ${valColor} font-mono font-bold outline-none" placeholder="0" ${disabledAttr}>
-                    ${deleteBtn}
+                    ${actionBtn}
                 `;
                 list.appendChild(row);
             });
@@ -1374,6 +1424,22 @@
             document.getElementById('modalTotal').textContent = '¥' + displayTotal.toLocaleString();
             document.getElementById('modalTotal').className = currentModalTab === 'actual' ? "text-3xl font-mono font-bold text-emerald-400" : "text-3xl font-mono font-bold text-blue-400";
         }
+
+        function reviewItem(idx) {
+            const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);
+            if (!category || !category.items || !category.items[idx]) return;
+
+            const item = category.items[idx];
+            const currentReview = item.review || "";
+            const newReview = prompt("この項目について振り返りコメントを入力してください\\n(AI診断の参考にされます):", currentReview);
+
+            if (newReview !== null) {
+                item.review = newReview;
+                if (window.saveToCloud) window.saveToCloud();
+                renderModalItems();
+            }
+        }
+        window.reviewItem = reviewItem;
 
         function convertCsvToBudget(val) {
             const category = window.appState[currentLevel][currentEditingType].find(c => c.id === currentEditingId);

@@ -371,7 +371,11 @@
                         <div class="grid grid-cols-3 gap-6">
                             <!-- Revenue Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
-                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL REVENUE (売上)
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
+                                    <span>TOTAL REVENUE (売上)</span>
+                                    <button id="btnReviewRev" onclick="reviewMainMetric('revenue')"
+                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
                                     <span class="text-3xl font-mono font-bold text-white" id="resRevAct">¥0</span>
@@ -388,7 +392,11 @@
 
                             <!-- Expense Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
-                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">TOTAL EXPENSE (支出)
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
+                                    <span>TOTAL EXPENSE (支出)</span>
+                                    <button id="btnReviewExp" onclick="reviewMainMetric('expense')"
+                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
                                     <span class="text-3xl font-mono font-bold text-white" id="resExpAct">¥0</span>
@@ -405,7 +413,11 @@
 
                             <!-- Profit Result -->
                             <div class="bg-slate-800 p-6 rounded-xl border-2 border-slate-700 relative overflow-hidden">
-                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest">OPERATING PROFIT (利益)
+                                <div class="text-xs text-slate-400 font-bold mb-2 tracking-widest flex justify-between">
+                                    <span>OPERATING PROFIT (利益)</span>
+                                    <button id="btnReviewProfit" onclick="reviewMainMetric('profit')"
+                                        class="hidden text-slate-500 hover:text-emerald-400 transition"
+                                        title="Add Comment">💬</button>
                                 </div>
                                 <div class="flex justify-between items-end mb-2">
                                     <span class="text-3xl font-mono font-bold text-white" id="resProfit">¥0</span>
@@ -820,7 +832,48 @@
                 });
             }
         }
+        updateFixButtonsState(isCurrentlyFixed);
+        }
         window.toggleFixMonth = toggleFixMonth;
+
+        function updateFixButtonsState(isFixed) {
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            const revBtn = document.getElementById('btnReviewRev');
+            const expBtn = document.getElementById('btnReviewExp');
+            const profBtn = document.getElementById('btnReviewProfit');
+
+            const els = [revBtn, expBtn, profBtn];
+
+            if (isFixed) {
+                // Check stored reviews to colorize
+                const saved = (window.appState.monthlyMetaReviews && window.appState.monthlyMetaReviews[currentMonthStr]) || {};
+
+                revBtn.className = saved.revenue ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
+                expBtn.className = saved.expense ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
+                profBtn.className = saved.profit ? "text-emerald-400 hover:text-white transition" : "text-slate-500 hover:text-emerald-400 transition";
+
+                els.forEach(el => el.classList.remove('hidden'));
+            } else {
+                els.forEach(el => el.classList.add('hidden'));
+            }
+        }
+
+        function reviewMainMetric(type) {
+            const currentMonthStr = fiscalMonths[currentMonthIdx];
+            if (!window.appState.monthlyMetaReviews) window.appState.monthlyMetaReviews = {};
+            if (!window.appState.monthlyMetaReviews[currentMonthStr]) window.appState.monthlyMetaReviews[currentMonthStr] = {};
+
+            const currentVal = window.appState.monthlyMetaReviews[currentMonthStr][type] || "";
+            const newVal = prompt(`Review comment for ${type.toUpperCase()}:`, currentVal);
+
+            if (newVal !== null) {
+                window.appState.monthlyMetaReviews[currentMonthStr][type] = newVal;
+                if (window.saveToCloud) window.saveToCloud();
+                // Update button color immediately
+                updateFixButtonsState(true);
+            }
+        }
+        window.reviewMainMetric = reviewMainMetric;
 
         async function analyzeWithGemini(monthStr, force = false) {
             const apiKey = localStorage.getItem('nakamura_gemini_key');
@@ -886,14 +939,32 @@
             const profit = totalRev - totalExp;
 
             let reviewContext = "";
+            let hasReview = false;
+
+            // 1. Gather Main Metric Reviews
+            if (window.appState.monthlyMetaReviews && window.appState.monthlyMetaReviews[monthStr]) {
+                const meta = window.appState.monthlyMetaReviews[monthStr];
+                if (meta.revenue) { reviewContext += `[Revenue Reflection] ${meta.revenue}\n`; hasReview = true; }
+                if (meta.expense) { reviewContext += `[Expense Reflection] ${meta.expense}\n`; hasReview = true; }
+                if (meta.profit) { reviewContext += `[Profit Reflection] ${meta.profit}\n`; hasReview = true; }
+            }
+
+            // 2. Gather Category Reviews
             if (userReviews.length > 0) {
+                reviewContext += `\n[Category Reviews]\n${userReviews.join('\n')}`;
+                hasReview = true;
+            }
+
+            if (hasReview) {
                 reviewContext = `
-                [User's Self-Reflections for specific items]
-                ${userReviews.join('\n')}
+                [User's Self-Reflections]
+                ${reviewContext}
                 
                 Please take these reflections into account. If the user mentions bad conditions, be sympathetic. If they mention waste, be strict.
                 Include specific advice based on these reviews.
                 `;
+            } else {
+                reviewContext = "";
             }
 
             const prompt = `
@@ -979,6 +1050,8 @@
             const btnToggle = document.getElementById('btnToggleFix');
             const statusBadge = document.getElementById('fixStatusBadge');
             const lockedOverlay = document.getElementById('lockedOverlay');
+
+            updateFixButtonsState(!!isFixed); // Update review buttons visibility
             const resultBoard = document.getElementById('resultBoard');
             const aiSection = document.getElementById('aiAnalysisSection');
 
